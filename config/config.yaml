@@ -1,0 +1,30 @@
+tiramisu:
+    tiramisu_path: "/home/dl5133/tiramisu"
+    workspace: "/scratch/dl5133/Dev/RL-Agent/new_agent/experiment_dir/workspace/"
+    experiment_dir: "/scratch/dl5133/Dev/RL-Agent/new_agent/experiment_dir/"
+
+env_vars:
+    CONDA_ENV: "/scratch/dl5133/conda-envs/tiramisu-build-env"
+    LD_LIBRARY_PATH: "${CONDA_ENV}/lib:${TIRAMISU_ROOT}/3rdParty/Halide/install/lib64:${TIRAMISU_ROOT}/3rdParty/llvm/build/lib:${TIRAMISU_ROOT}/3rdParty/isl/build/lib:"
+
+
+dataset:
+    dataset_format: PICKLE
+    # cpps_path: /scratch/dl5133/Dev/RL-Agent/tiramisu-env/datasets/cpp_files_220k.pkl
+    # dataset_path: /scratch/dl5133/Dev/RL-Agent/tiramisu-env/datasets/schedules_220k.pkl
+    cpps_path: /scratch/dl5133/Dev/RL-Agent/new_agent/dataset/cpps.pkl
+    dataset_path: /scratch/dl5133/Dev/RL-Agent/new_agent/dataset/data.pkl
+    save_path: /scratch/dl5133/Dev/RL-Agent/new_agent/dataset/
+    shuffle: True
+    seed: 13
+    saving_frequency: 10000
+    # When doing evaluation on the benchmark set the value to True
+    is_benchmark: False
+    benchmark_cpp_files: /scratch/dl5133/Dev/RL-Agent/tiramisu-env/datasets/old_benchmark_cpps.pkl
+    benchmark_dataset_path: /scratch/dl5133/Dev/RL-Agent/tiramisu-env/datasets/old_benchmark.pkl
+    # benchmark_cpp_files: /scratch/dl5133/Dev/RL-Agent/tiramisu-env/datasets/supported_polybench_cpps.pkl
+    # benchmark_dataset_path: /scratch/dl5133/Dev/RL-Agent/tiramisu-env/datasets/supported_polybench_schedules.pkl
+
+experiment:
+    legality_speedup: 1.0
+    beam_search_order: true

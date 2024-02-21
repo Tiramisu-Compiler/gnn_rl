@@ -16,15 +16,16 @@ clip_epsilon = 0.2
 gamma = 0.99
 lambdaa = 0.95
 value_coeff = 0.5
-entropy_coeff_start = 0
+entropy_coeff_start = 0.01
 entropy_coeff_finish = 0
 max_grad_norm = 1
 batch_size = 4096
-num_epochs = 10
+num_epochs = 4
 mini_batch_size = 128
-start_lr = 1e-4
-final_lr = 1e-4
+start_lr = 5e-4
+final_lr = 5e-4
 weight_decay = 0
+total_steps = num_updates * batch_size
 NUM_ROLLOUT_WORKERS = 8
 
 
@@ -58,7 +59,7 @@ if "__main__" == __name__:
         for i in range(NUM_ROLLOUT_WORKERS)
     ]
 
-    run_name = "exec_training_bench_2"
+    run_name = "exec_training_bench_4"
 
     with mlflow.start_run(
         run_name=run_name,
@@ -90,10 +91,10 @@ if "__main__" == __name__:
             #     -2 * u / num_updates
             # )
 
-            entropy_coeff = entropy_coeff_finish
-            # entropy_coeff = entropy_coeff_finish - (
-            #     entropy_coeff_finish - entropy_coeff_start
-            # ) * np.exp(-global_steps / 5_000)
+            # entropy_coeff = entropy_coeff_finish
+            entropy_coeff = entropy_coeff_finish - (
+                entropy_coeff_finish - entropy_coeff_start
+            ) * np.exp(-global_steps / total_steps)
 
             num_steps = 0
             b_actions = torch.Tensor([]).to(device)
@@ -241,7 +242,7 @@ if "__main__" == __name__:
             speedups_mean = b_speedups.mean().item()
 
             if best_performance < speedups_mean:
-                torch.save(ppo_agent.state_dict(), f"./models/model_{run_name}_{u}.pt")
+                torch.save(ppo_agent.state_dict(), f"./experiment_dir/models/model_{run_name}_{u}.pt")
                 best_performance = speedups_mean
 
             infos = {

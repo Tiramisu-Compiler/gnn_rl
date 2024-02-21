@@ -3,7 +3,6 @@ __pycache__/
 .ipynb_checkpoints/
 experiment_dir
 mlruns
-models
 dataset
 
 

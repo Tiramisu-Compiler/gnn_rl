@@ -2,6 +2,7 @@ import numpy as np , copy
 from config.config import Config
 from env_api.core.models.tiramisu_program import TiramisuProgram
 from env_api.scheduler.models.action import *
+from env_api.scheduler.models.actions_mask import ActionsMask
 
 class Schedule:
     def __init__(self, program: TiramisuProgram):
@@ -51,7 +52,11 @@ class Schedule:
             ]
     
     def __set_action_mask(self):
-        self.actions_mask = np.zeros(32)
+        self.actions_mask = ActionsMask(num_types=7, 
+                                        loop_levels = 4, 
+                                        tiling_params = 9,
+                                        unrolling_params = 3, 
+                                        interchange_loops = 10)
 
     def __form_iterators_dict(self):
         for comp in self.comps:
@@ -129,20 +134,4 @@ class Schedule:
 
     
     def update_actions_mask(self, action : Action,applied : bool = True):
-        # Whether an action is legal or not we should mask it to not use it again
-        self.actions_mask[action.env_id] = 1
-
-        if applied and Config.config.experiment.beam_search_order:
-            self.apply_beam_search_conditions(action=action)
-    
-    def apply_beam_search_conditions(self, action : Action):
-        # The order of actions in beam search :
-        # Fusion, [Interchange, reversal, skewing], parallelization, tiling, unrolling
-        if (isinstance(action,Parallelization)):
-            self.actions_mask[0:12] = 1
-
-        elif (isinstance(action,Tiling)) : 
-            self.actions_mask[0:26] = 1
-
-        elif (isinstance(action,Unrolling)):
-            self.actions_mask[0:31] = 1
+        self.actions_mask.update_mask(action, applied)

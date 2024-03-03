@@ -14,6 +14,7 @@ if __name__ == "__main__":
     try:
         # Select a program randomly for example program = "function025885"
         program: str = random.choice(programs)
+        program = "function_cvtcolor_MEDIUM"
         print("Selected function : ", program)
         # set_program(str) creates all the necessary objects to start doing operations on a program
         # it returns an encoded representation specific to the RL system
@@ -25,7 +26,10 @@ if __name__ == "__main__":
             # And expect to get the speedup of the whole schedule, the representation and the result of legality check of the last operation
             
 
+            wrapper_cpp_code, wrapper_h_code = tiramisu_api.scheduler_service.schedule_object.prog.build_wrappers()
 
+            print(wrapper_cpp_code)
+            print(wrapper_h_code)
             # (speedup, embedding_tensor,
             #  legality,actions_mask) = tiramisu_api.skew(loop_level1=0,loop_level2=1,env_id=2)
 

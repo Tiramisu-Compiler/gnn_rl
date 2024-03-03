@@ -73,31 +73,31 @@ class TiramisuProgram():
             self.buffer_sizes.append(re.findall(r"\d+", sizes_vect))
 
 
-    def build_wrappers(tiramisu_program):
+    def build_wrappers(self):
         buffers_init_lines = ""
-        for i, buffer_name in enumerate(tiramisu_program.IO_buffer_names):
+        for i, buffer_name in enumerate(self.IO_buffer_names):
             buffers_init_lines += f"""
-    double *c_{buffer_name} = (double*)malloc({'*'.join(tiramisu_program.buffer_sizes[i][::-1])}* sizeof(double));
-    parallel_init_buffer(c_{buffer_name}, {'*'.join(tiramisu_program.buffer_sizes[i][::-1])}, (double){str(random.randint(1,10))});
-    Halide::Buffer<double> {buffer_name}(c_{buffer_name}, {','.join(tiramisu_program.buffer_sizes[i][::-1])});
+    double *c_{buffer_name} = (double*)malloc({'*'.join(self.buffer_sizes[i][::-1])}* sizeof(double));
+    parallel_init_buffer(c_{buffer_name}, {'*'.join(self.buffer_sizes[i][::-1])}, (double){str(random.randint(1,10))});
+    Halide::Buffer<double> {buffer_name}(c_{buffer_name}, {','.join(self.buffer_sizes[i][::-1])});
     """
-        if tiramisu_program.name is None:
+        if self.name is None:
             raise Exception("TiramisuProgram.name is None")
 
-        wrapper_cpp_code = WrappersCode.wrapper_cpp_template.replace("$func_name$", tiramisu_program.name)
+        wrapper_cpp_code = WrappersCode.wrapper_cpp_template.replace("$func_name$", self.name)
         wrapper_cpp_code = wrapper_cpp_code.replace(
             "$buffers_init$", buffers_init_lines
         )
     
         wrapper_cpp_code = wrapper_cpp_code.replace(
             "$func_params$",
-            ",".join([name + ".raw_buffer()" for name in tiramisu_program.IO_buffer_names]),
+            ",".join([name + ".raw_buffer()" for name in self.IO_buffer_names]),
         )
 
-        wrapper_h_code = WrappersCode.wrapper_h_template.replace("$func_name$", tiramisu_program.name)
+        wrapper_h_code = WrappersCode.wrapper_h_template.replace("$func_name$", self.name)
         wrapper_h_code = wrapper_h_code.replace(
             "$func_params$",
-            ",".join(["halide_buffer_t *" + name for name in tiramisu_program.IO_buffer_names]),
+            ",".join(["halide_buffer_t *" + name for name in self.IO_buffer_names]),
         )
 
         return wrapper_cpp_code, wrapper_h_code

@@ -1,15 +1,15 @@
 import torch
-from agent.policy_value_nn import GAT
+from agent.policy_value_nn import GATMultiDiscrete
 from agent.rollout_worker import RolloutWorker
 from config.config import Config
 from env_api.core.services.compiling_service import CompilingService
 from utils.dataset_actor.dataset_actor import DatasetActor
 import ray
 import json
-import os 
+import os
 
 
-NUM_ROLLOUT_WORKERS = 20
+NUM_ROLLOUT_WORKERS = 3
 
 
 def write_cpp_file(schedule_object):
@@ -39,15 +39,23 @@ if "__main__" == __name__:
     dataset_worker = DatasetActor.remote(Config.config.dataset)
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=172, num_outputs=32).to(
-        device
+    ppo_agent = GATMultiDiscrete(
+        input_size=718,
+        num_heads=4,
+        hidden_size=32,
+        num_types=7,
+        num_loops=4,
+        i_actions=10,
+        u_actons=3,
+        t_actions=9,
+    ).to(device)
+
+    ppo_agent.load_state_dict(
+        torch.load(
+            "/scratch/dl5133/Dev/RL-Agent/new_agent/experiment_dir/models/model_exec_training_bench_md_8_502.pt",
+            map_location=torch.device(device),
+        )
     )
-
-    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=172, num_outputs=32).to(device)
-
-
-    ppo_agent.load_state_dict(torch.load("/scratch/dl5133/Dev/RL-Agent/new_agent/models/model_exec_training_with_init_103_70.pt", map_location=torch.device(device)))
-
 
     rollout_workers = [
         RolloutWorker.options(
@@ -56,7 +64,7 @@ if "__main__" == __name__:
         for i in range(NUM_ROLLOUT_WORKERS)
     ]
 
-    num_functions = ray.get(dataset_worker.get_dataset_size.remote()) 
+    num_functions = ray.get(dataset_worker.get_dataset_size.remote())
 
     res = {}
 
@@ -67,18 +75,16 @@ if "__main__" == __name__:
                 for i in range(NUM_ROLLOUT_WORKERS)
             ]
         )
-        for result in results : 
-            full_log += result['log_trajectory']
+        for result in results:
+            full_log += result["log_trajectory"]
             res[result["schedule_object"].prog.name] = {}
-            res[result["schedule_object"].prog.name]["schedule"] = result["schedule_object"].schedule_str
+            res[result["schedule_object"].prog.name]["schedule"] = result[
+                "schedule_object"
+            ].schedule_str
             res[result["schedule_object"].prog.name]["speedup"] = result["speedup"]
             write_cpp_file(result["schedule_object"])
 
-
-        ray.get(
-                [rollout_workers[i].reset.remote() for i in range(NUM_ROLLOUT_WORKERS)]
-            )
-
+        ray.get([rollout_workers[i].reset.remote() for i in range(NUM_ROLLOUT_WORKERS)])
 
     results = ray.get(
         [
@@ -86,21 +92,26 @@ if "__main__" == __name__:
             for i in range(num_functions % NUM_ROLLOUT_WORKERS)
         ]
     )
-    for result in results : 
-        full_log += result['log_trajectory']
+    for result in results:
+        full_log += result["log_trajectory"]
         res[result["schedule_object"].prog.name] = {}
-        res[result["schedule_object"].prog.name]["schedule"] = result["schedule_object"].schedule_str
+        res[result["schedule_object"].prog.name]["schedule"] = result[
+            "schedule_object"
+        ].schedule_str
         res[result["schedule_object"].prog.name]["speedup"] = result["speedup"]
         write_cpp_file(result["schedule_object"])
 
     ray.get(
-            [rollout_workers[i].reset.remote() for i in range(num_functions % NUM_ROLLOUT_WORKERS)]
-        )
+        [
+            rollout_workers[i].reset.remote()
+            for i in range(num_functions % NUM_ROLLOUT_WORKERS)
+        ]
+    )
 
-    with open("./results.json", "w") as file :
+    with open("./results.json", "w") as file:
         json.dump(res, file)
 
-    with open("./log.txt", "w") as file : 
+    with open("./log.txt", "w") as file:
         file.write(full_log)
 
     ray.shutdown()

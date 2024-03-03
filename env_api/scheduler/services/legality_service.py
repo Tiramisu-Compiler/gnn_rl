@@ -20,12 +20,12 @@ class LegalityService:
         output :
             - legality_check : bool
         """
-        branches[current_branch].update_actions_mask(action=action, applied=False)
         # Check first if the iterator(s) level(s) is(are) included in the current iterators
         # If not then the action is illegal by default 
         exceeded_iterators = self.check_iterators(branches=branches,
                                                   current_branch = current_branch,
                                                   action=action)
+        branches[current_branch].update_actions_mask(action=action, applied=False)
         if exceeded_iterators : return False
 
         # The legality of Skewing is different than the others , we need to get the skewing params from the solver
@@ -107,13 +107,11 @@ class LegalityService:
             innermost_iterator = list(branches[current_branch].prog.annotations["iterators"].keys())[-1]
             lower_bound =  int(branches[current_branch].prog.annotations["iterators"][innermost_iterator]['lower_bound'])
             upper_bound =  int(branches[current_branch].prog.annotations["iterators"][innermost_iterator]['upper_bound'])
-            if (abs(upper_bound-lower_bound) < unrolling_factor):
-                return True
             
             loop_level = len(branches[current_branch].common_it) -1 + branches[current_branch].additional_loops
             action.params = copy.deepcopy([loop_level, unrolling_factor])
             action.set_comps(copy.deepcopy(branches[current_branch].comps))
-            return False 
+            return (abs(upper_bound-lower_bound) < unrolling_factor) 
         else : 
             num_iter = branches[current_branch].common_it.__len__()
             if isinstance(action, Tiling):

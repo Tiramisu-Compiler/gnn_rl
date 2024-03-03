@@ -1,7 +1,7 @@
 import mlflow
 import torch
 import torch.nn as nn
-from agent.policy_value_nn import GAT
+from agent.policy_value_nn import GATMultiDiscrete
 from agent.rollout_worker import RolloutWorker, Transition
 from config.config import Config
 from utils.dataset_actor.dataset_actor import DatasetActor
@@ -12,21 +12,22 @@ from torch_geometric.data import Batch, Data
 
 
 num_updates = 1000
-clip_epsilon = 0.2
+clip_epsilon = 0.3
 gamma = 0.99
 lambdaa = 0.95
-value_coeff = 0.5
-entropy_coeff_start = 0.01
+value_coeff = 1
+entropy_coeff_start = 0.1
 entropy_coeff_finish = 0
 max_grad_norm = 1
-batch_size = 4096
+batch_size = 512
 num_epochs = 4
-mini_batch_size = 128
-start_lr = 5e-4
-final_lr = 5e-4
+mini_batch_size = 64
+start_lr = 1e-4
+final_lr = 1e-4
 weight_decay = 0
 total_steps = num_updates * batch_size
 NUM_ROLLOUT_WORKERS = 8
+CPUS_PER_WORKER = 12
 
 
 if "__main__" == __name__:
@@ -37,9 +38,16 @@ if "__main__" == __name__:
     dataset_worker = DatasetActor.remote(Config.config.dataset)
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=172, num_outputs=32).to(
-        device
-    )
+    ppo_agent = GATMultiDiscrete(
+        input_size=718,
+        num_heads=4,
+        hidden_size=32,
+        num_types=7,
+        num_loops=4,
+        i_actions=10,
+        u_actons=3,
+        t_actions=9,
+    ).to(device)
     optimizer = torch.optim.Adam(
         ppo_agent.parameters(), lr=start_lr, weight_decay=weight_decay, eps=1e-5
     )
@@ -54,12 +62,12 @@ if "__main__" == __name__:
 
     rollout_workers = [
         RolloutWorker.options(
-            num_cpus=12, num_gpus=0, scheduling_strategy="SPREAD"
+            num_cpus=CPUS_PER_WORKER, num_gpus=0, scheduling_strategy="SPREAD"
         ).remote(dataset_worker, Config.config, worker_id=i)
         for i in range(NUM_ROLLOUT_WORKERS)
     ]
 
-    run_name = "exec_training_bench_4"
+    run_name = "exec_training_bench_md_9"
 
     with mlflow.start_run(
         run_name=run_name,
@@ -94,7 +102,7 @@ if "__main__" == __name__:
             # entropy_coeff = entropy_coeff_finish
             entropy_coeff = entropy_coeff_finish - (
                 entropy_coeff_finish - entropy_coeff_start
-            ) * np.exp(-global_steps / total_steps)
+            ) * np.exp(-50 * global_steps / total_steps)
 
             num_steps = 0
             b_actions = torch.Tensor([]).to(device)
@@ -127,7 +135,7 @@ if "__main__" == __name__:
                     m += 1
                     num_steps += trajectory_len
 
-                    actions = torch.Tensor(full_trajectory.action).to(device)
+                    actions = torch.cat(full_trajectory.action, dim=1).to(device)
                     log_probs = torch.Tensor(full_trajectory.log_prob).to(device)
                     rewards = torch.Tensor(full_trajectory.reward).to(device)
                     values = torch.Tensor(full_trajectory.value).to(device)
@@ -169,7 +177,7 @@ if "__main__" == __name__:
 
                     returns = advantages + values
 
-                    b_actions = torch.cat([b_actions, actions]).to(device)
+                    b_actions = torch.cat([b_actions, actions], dim=1).to(device)
                     b_log_probs = torch.cat([b_log_probs, log_probs]).to(device)
                     b_advantages = torch.cat([b_advantages, advantages]).to(device)
                     b_returns = torch.cat([b_returns, returns]).to(device)
@@ -201,10 +209,10 @@ if "__main__" == __name__:
                 for b in range(0, batch_size, mini_batch_size):
                     start, end = b, b + mini_batch_size
                     rand_ind = batch_indices[start:end]
-                    _, new_log_prob, new_entropy, new_value = ppo_agent(
-                        Batch.from_data_list(b_states[rand_ind]).to(device),
-                        actions_mask=None,
-                        action=b_actions[rand_ind],
+                    _, _ , new_log_prob, new_entropy, new_value = ppo_agent(
+                        data=Batch.from_data_list(b_states[rand_ind]).to(device),
+                        input_actions=b_actions.T[rand_ind].T.type(torch.long).to(device),
+                        action_mask=None,
                     )
                     ratio = new_log_prob - b_log_probs[rand_ind]
                     ratio.exp()
@@ -242,7 +250,10 @@ if "__main__" == __name__:
             speedups_mean = b_speedups.mean().item()
 
             if best_performance < speedups_mean:
-                torch.save(ppo_agent.state_dict(), f"./experiment_dir/models/model_{run_name}_{u}.pt")
+                torch.save(
+                    ppo_agent.state_dict(),
+                    f"./experiment_dir/models/model_{run_name}_{u}.pt",
+                )
                 best_performance = speedups_mean
 
             infos = {

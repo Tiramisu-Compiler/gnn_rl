@@ -4,13 +4,15 @@ import ray
 import torch
 import torch.nn as nn
 import math
-from torch_geometric.data import Data
-from agent.graph_utils import *
+from torch_geometric.data import Data, Batch
+import agent.graph_utils as graph_utils
 from config.config import Config
+from env_api.scheduler.models.actions_mask import ActionsMask
 from env_api.tiramisu_api import TiramisuEnvAPI
+import numpy as np
 
 
-def apply_flattened_action(
+def apply_action(
     tiramisu_api: TiramisuEnvAPI,
     action,
     node_feats,
@@ -19,157 +21,113 @@ def apply_flattened_action(
     worker_id="0",
 ):
     done = False
-    if action < 4:
-        loop_level = action
-        # Interchange of loops (0,1) (1,2) (2,3) (3,4)
-        (
-            speedup,
-            legality,
-            actions_mask,
-        ) = tiramisu_api.interchange(
-            loop_level1=loop_level,
-            loop_level2=loop_level + 1,
-            env_id=action,
-            worker_id=worker_id,
-        )
-        if legality:
-            branch = tiramisu_api.scheduler_service.current_branch
-            its = tiramisu_api.scheduler_service.branches[branch].common_it
-            apply_interchange(
-                [its[loop_level], its[loop_level + 1]], edge_index, it_index
+    match action[0]:
+        case 0:
+            loop_level = action[1]
+            speedup, legality, actions_mask = tiramisu_api.skew(
+                loop_level1=loop_level,
+                loop_level2=loop_level + 1,
+                worker_id=worker_id,
             )
-    elif action < 9:
-        loop_level = action - 4
-        # Reversal from 0 to 4
-        (
-            speedup,
-            legality,
-            actions_mask,
-        ) = tiramisu_api.reverse(
-            loop_level=loop_level, env_id=action, worker_id=worker_id
-        )
-        if legality:
-            branch = tiramisu_api.scheduler_service.current_branch
-            its = tiramisu_api.scheduler_service.branches[branch].common_it
-            apply_reversal(its[loop_level], node_feats, it_index)
-    elif action < 12:
-        loop_level = action - 9
-        # Skewing 0,1 to 2,3
-        speedup, legality, actions_mask = tiramisu_api.skew(
-            loop_level1=loop_level,
-            loop_level2=loop_level + 1,
-            env_id=action,
-            worker_id=worker_id,
-        )
+            if legality:
+                skewing_params = (
+                    tiramisu_api.scheduler_service.schedule_object.schedule_list[
+                        -1
+                    ].params[-2:]
+                )
+                branch = tiramisu_api.scheduler_service.current_branch
+                its = tiramisu_api.scheduler_service.branches[branch].common_it
+                graph_utils.apply_skewing(
+                    [its[loop_level], its[loop_level + 1]],
+                    skewing_params,
+                    node_feats,
+                    it_index,
+                )
+        case 1:
+            loop_level = action[1]
+            speedup, legality, actions_mask = tiramisu_api.reverse(
+                loop_level=loop_level, worker_id=worker_id
+            )
+            if legality:
+                branch = tiramisu_api.scheduler_service.current_branch
+                its = tiramisu_api.scheduler_service.branches[branch].common_it
+                graph_utils.apply_reversal(its[loop_level], node_feats, it_index)
+        case 2:
+            loop_level = action[1]
+            speedup, legality, actions_mask = tiramisu_api.parallelize(
+                loop_level=loop_level, worker_id=worker_id
+            )
+            if legality:
+                branch = tiramisu_api.scheduler_service.current_branch
+                its = tiramisu_api.scheduler_service.branches[branch].common_it
+                graph_utils.apply_parallelization(its[loop_level], node_feats, it_index)
+        case 3:
+            loop_level1, loop_level2 =[(i,j) for i in range(4) for j in range(i+1,5)][action[1]]
+             
+            speedup, legality, actions_mask = tiramisu_api.interchange(
+                loop_level1=loop_level1,
+                loop_level2=loop_level2 ,
+                worker_id=worker_id,
+            )
+            if legality:
+                branch = tiramisu_api.scheduler_service.current_branch
+                its = tiramisu_api.scheduler_service.branches[branch].common_it
+                graph_utils.apply_interchange(
+                    [its[loop_level1], its[loop_level2]], edge_index, it_index
+                )
 
-        if legality:
-            skewing_params = (
-                tiramisu_api.scheduler_service.schedule_object.schedule_list[-1].params[
-                    -2:
-                ]
+        case 4:
+            factor = 4 + action[1]
+            speedup, legality, actions_mask = tiramisu_api.unroll(
+                unrolling_factor=2**factor,
+                worker_id=worker_id,
             )
-            branch = tiramisu_api.scheduler_service.current_branch
-            its = tiramisu_api.scheduler_service.branches[branch].common_it
-            apply_skewing(
-                [its[loop_level], its[loop_level + 1]],
-                skewing_params,
-                node_feats,
-                it_index,
-            )
-    elif action < 14:
-        loop_level = action - 12
-        # For parallelization 0 and 1
-        (
-            speedup,
-            legality,
-            actions_mask,
-        ) = tiramisu_api.parallelize(
-            loop_level=loop_level, env_id=action, worker_id=worker_id
-        )
-        if legality:
-            branch = tiramisu_api.scheduler_service.current_branch
-            its = tiramisu_api.scheduler_service.branches[branch].common_it
-            apply_parallelization(its[loop_level], node_feats, it_index)
-    elif action < 18:
-        loop_level = action - 14
-        speedup, legality, actions_mask = tiramisu_api.tile2D(
-            loop_level1=loop_level,
-            loop_level2=loop_level + 1,
-            size_x=32,
-            size_y=32,
-            env_id=action,
-            worker_id=worker_id,
-        )
-        if legality:
-            branch = tiramisu_api.scheduler_service.current_branch
-            its = tiramisu_api.scheduler_service.branches[branch].common_it
-            apply_tiling(
-                [its[loop_level], its[loop_level + 1]], [32, 32], node_feats, it_index
-            )
-    elif action < 22:
-        loop_level = action - 18
-        speedup, legality, actions_mask = tiramisu_api.tile2D(
-            loop_level1=loop_level,
-            loop_level2=loop_level + 1,
-            size_x=128,
-            size_y=128,
-            env_id=action,
-            worker_id=worker_id,
-        )
-        if legality:
-            branch = tiramisu_api.scheduler_service.current_branch
-            its = tiramisu_api.scheduler_service.branches[branch].common_it
-            apply_tiling(
-                [its[loop_level], its[loop_level + 1]], [128, 128], node_feats, it_index
-            )
-    elif action < 26:
-        loop_level = action - 22
+            if legality:
+                branch = tiramisu_api.scheduler_service.current_branch
+                its = tiramisu_api.scheduler_service.branches[branch].common_it
+                graph_utils.apply_unrolling(its[-1], 2**factor, node_feats, it_index)
 
-        speedup, legality, actions_mask = tiramisu_api.tile2D(
-            loop_level1=loop_level,
-            loop_level2=loop_level + 1,
-            size_x=256,
-            size_y=256,
-            env_id=action,
-            worker_id=worker_id,
-        )
-        if legality:
-            branch = tiramisu_api.scheduler_service.current_branch
-            its = tiramisu_api.scheduler_service.branches[branch].common_it
-            apply_tiling(
-                [its[loop_level], its[loop_level + 1]], [256, 256], node_feats, it_index
+        case 5:
+            loop_level = action[1]
+            x, y = action[2] // 3, action[2] % 3
+            size_x, size_y = [32, 64, 128][x], [32, 64, 128][y]
+            speedup, legality, actions_mask = tiramisu_api.tile2D(
+                loop_level1=loop_level,
+                loop_level2=loop_level + 1,
+                size_x=size_x,
+                size_y=size_y,
+                worker_id=worker_id,
             )
-    elif action < 31:
-        factor = action - 24
-        speedup, legality, actions_mask = tiramisu_api.unroll(
-            unrolling_factor=2**factor, env_id=action, worker_id=worker_id
-        )
-        if legality:
-            branch = tiramisu_api.scheduler_service.current_branch
-            its = tiramisu_api.scheduler_service.branches[branch].common_it
-            apply_unrolling(its[-1], 2**factor, node_feats, it_index)
-    else:
-        # Next case
-        next_branch_mask = tiramisu_api.scheduler_service.next_branch()
-        if not (isinstance(next_branch_mask, np.ndarray)):
-            speedup, legality, actions_mask = (
-                1,
-                True,
-                np.zeros(32),
-            )
-            done = True
-        else:
-            speedup, legality, actions_mask = (
-                1,
-                True,
-                next_branch_mask,
-            )
-            branch = tiramisu_api.scheduler_service.current_branch
-            node_feats = focus_on_iterators(
-                tiramisu_api.scheduler_service.branches[branch].common_it,
-                node_feats,
-                it_index,
-            )
+            if legality:
+                branch = tiramisu_api.scheduler_service.current_branch
+                its = tiramisu_api.scheduler_service.branches[branch].common_it
+                graph_utils.apply_tiling(
+                    [its[loop_level], its[loop_level + 1]],
+                    [size_x, size_y],
+                    node_feats,
+                    it_index,
+                )
+        case 6:
+            next_branch_mask = tiramisu_api.scheduler_service.next_branch()
+            if next_branch_mask == None:
+                speedup, legality, actions_mask = (
+                    1,
+                    True,
+                    ActionsMask(),
+                )
+                done = True
+            else:
+                speedup, legality, actions_mask = (
+                    1,
+                    True,
+                    next_branch_mask,
+                )
+                branch = tiramisu_api.scheduler_service.current_branch
+                node_feats = graph_utils.focus_on_iterators(
+                    tiramisu_api.scheduler_service.branches[branch].common_it,
+                    node_feats,
+                    it_index,
+                )
 
     return speedup, node_feats, edge_index, legality, actions_mask, done
 
@@ -182,9 +140,6 @@ Transition = namedtuple(
 @ray.remote
 class RolloutWorker:
     def __init__(self, dataset_worker, config, worker_id=0):
-        import socket
-
-        print(socket.gethostname())
         Config.config = config
         self.tiramisu_api = TiramisuEnvAPI(local_dataset=False)
         self.dataset_worker = dataset_worker
@@ -204,19 +159,21 @@ class RolloutWorker:
 
     def reset(self):
         actions_mask = None
-        while not isinstance(actions_mask, np.ndarray):
+        while actions_mask == None:
             prog_infos = ray.get(self.dataset_worker.get_next_function.remote())
             actions_mask = self.tiramisu_api.set_program(*prog_infos)
 
         self.current_program = prog_infos[0]
 
-        self.actions_mask = torch.tensor(actions_mask)
+        self.actions_mask = actions_mask
         annotations = (
             self.tiramisu_api.scheduler_service.schedule_object.prog.annotations
         )
-        node_feats, edge_index, it_index, comp_index = build_graph(annotations)
+        node_feats, edge_index, it_index, comp_index = graph_utils.build_graph(
+            annotations
+        )
 
-        node_feats = focus_on_iterators(
+        node_feats = graph_utils.focus_on_iterators(
             self.tiramisu_api.scheduler_service.branches[0].common_it,
             node_feats,
             it_index,
@@ -245,10 +202,10 @@ class RolloutWorker:
             ).to(device)
 
             with torch.no_grad():
-                action, action_log_prob, entropy, value = model(
-                    data, self.actions_mask.to(device)
+                action, raw_action, action_log_prob, entropy, value = model(
+                    data=Batch.from_data_list([data]).to(device),
+                    action_mask=self.actions_mask.to(device),
                 )
-                action = action.item()
                 action_log_prob = action_log_prob.item()
                 value = value.item()
             (
@@ -258,7 +215,7 @@ class RolloutWorker:
                 legality,
                 actions_mask,
                 done,
-            ) = apply_flattened_action(
+            ) = apply_action(
                 self.tiramisu_api,
                 action,
                 np.copy(node_feats),
@@ -266,14 +223,14 @@ class RolloutWorker:
                 it_index,
                 worker_id=str(self.worker_id),
             )
-            self.actions_mask = torch.tensor(actions_mask)
+            self.actions_mask = actions_mask
 
             reward = self.reward_process(action, legality, total_speedup)
 
             trajectory.append(
                 (
                     (np.copy(node_feats), np.copy(edge_index)),
-                    action,
+                    raw_action,
                     reward,
                     value,
                     action_log_prob,
@@ -289,6 +246,8 @@ class RolloutWorker:
                 + f"\nActions Sequence So far : {self.tiramisu_api.scheduler_service.schedule_object.schedule_str}"
                 + "\n"
             )
+
+            done = done or (self.steps == 25)
 
         else:
             schedule_object = self.tiramisu_api.scheduler_service.schedule_object
@@ -308,14 +267,14 @@ class RolloutWorker:
         }
 
     def reward_process(self, action, legality, total_speedup):
-        switching_branch_penality = 1
-        illegal_action_penality = 1
+        switching_branch_penality = 0.5
+        illegal_action_penality = 0.9
         max_speedup = np.inf
         log_base = 4
 
         if legality:
-            if action != 31:
-                # If the action os not Next
+            if action[0] != 6:
+                # If the action is not Next
                 instant_speedup = total_speedup / self.previous_speedup
                 self.previous_speedup = total_speedup
             else:

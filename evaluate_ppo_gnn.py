@@ -39,12 +39,9 @@ if "__main__" == __name__:
     dataset_worker = DatasetActor.remote(Config.config.dataset)
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=172, num_outputs=32).to(
+    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=172, num_outputs=56).to(
         device
     )
-
-    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=172, num_outputs=32).to(device)
-
 
     ppo_agent.load_state_dict(torch.load("/scratch/dl5133/Dev/RL-Agent/new_agent/models/model_exec_training_with_init_103_70.pt", map_location=torch.device(device)))
 

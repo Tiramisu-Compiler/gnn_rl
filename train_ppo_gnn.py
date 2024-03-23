@@ -15,7 +15,7 @@ num_updates = 1000
 clip_epsilon = 0.2
 gamma = 0.99
 lambdaa = 0.95
-value_coeff = 0.5
+value_coeff = 2
 entropy_coeff_start = 0.01
 entropy_coeff_finish = 0
 max_grad_norm = 1
@@ -26,7 +26,7 @@ start_lr = 5e-4
 final_lr = 5e-4
 weight_decay = 0
 total_steps = num_updates * batch_size
-NUM_ROLLOUT_WORKERS = 8
+NUM_ROLLOUT_WORKERS = 6
 
 
 if "__main__" == __name__:
@@ -37,7 +37,7 @@ if "__main__" == __name__:
     dataset_worker = DatasetActor.remote(Config.config.dataset)
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=172, num_outputs=32).to(
+    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=172, num_outputs=56).to(
         device
     )
     optimizer = torch.optim.Adam(
@@ -54,12 +54,12 @@ if "__main__" == __name__:
 
     rollout_workers = [
         RolloutWorker.options(
-            num_cpus=12, num_gpus=0, scheduling_strategy="SPREAD"
+            num_cpus=24, num_gpus=0, scheduling_strategy="SPREAD"
         ).remote(dataset_worker, Config.config, worker_id=i)
         for i in range(NUM_ROLLOUT_WORKERS)
     ]
 
-    run_name = "exec_training_bench_4"
+    run_name = "exec_training_bench_103"
 
     with mlflow.start_run(
         run_name=run_name,
@@ -104,6 +104,7 @@ if "__main__" == __name__:
             b_advantages = torch.Tensor([]).to(device)
             b_returns = torch.Tensor([]).to(device)
             b_entropy = torch.Tensor([]).to(device)
+            b_actions_mask = torch.Tensor([]).to(device)
             b_states = []
             b_speedups = []
             avg_episode_length = 0
@@ -132,6 +133,7 @@ if "__main__" == __name__:
                     rewards = torch.Tensor(full_trajectory.reward).to(device)
                     values = torch.Tensor(full_trajectory.value).to(device)
                     entropies = torch.Tensor(full_trajectory.entropy).to(device)
+                    actions_mask = torch.Tensor(full_trajectory.actions_mask).to(device)
                     # Calculating advantages and lambda returns
                     advantages = torch.zeros(trajectory_len).to(device)
                     returns = torch.zeros(trajectory_len).to(device)
@@ -174,6 +176,7 @@ if "__main__" == __name__:
                     b_advantages = torch.cat([b_advantages, advantages]).to(device)
                     b_returns = torch.cat([b_returns, returns]).to(device)
                     b_entropy = torch.cat([b_entropy, entropies]).to(device)
+                    b_actions_mask = torch.cat([b_actions_mask, actions_mask]).to(device)
                     b_states.extend(states)
 
                 ray.get(
@@ -203,7 +206,7 @@ if "__main__" == __name__:
                     rand_ind = batch_indices[start:end]
                     _, new_log_prob, new_entropy, new_value = ppo_agent(
                         Batch.from_data_list(b_states[rand_ind]).to(device),
-                        actions_mask=None,
+                        actions_mask=b_actions_mask[rand_ind],
                         action=b_actions[rand_ind],
                     )
                     ratio = new_log_prob - b_log_probs[rand_ind]

@@ -51,7 +51,7 @@ class Schedule:
             ]
     
     def __set_action_mask(self):
-        self.actions_mask = np.zeros(32)
+        self.actions_mask = np.zeros(56)
 
     def __form_iterators_dict(self):
         for comp in self.comps:
@@ -142,7 +142,7 @@ class Schedule:
             self.actions_mask[0:12] = 1
 
         elif (isinstance(action,Tiling)) : 
-            self.actions_mask[0:26] = 1
+            self.actions_mask[0:50] = 1
 
         elif (isinstance(action,Unrolling)):
-            self.actions_mask[0:31] = 1
+            self.actions_mask[0:55] = 1

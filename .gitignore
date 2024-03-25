@@ -9,3 +9,4 @@ dataset
 *.txt
 *.json
 *.sh
+*.pkl

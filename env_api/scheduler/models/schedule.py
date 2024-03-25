@@ -138,7 +138,12 @@ class Schedule:
     def apply_beam_search_conditions(self, action : Action):
         # The order of actions in beam search :
         # Fusion, [Interchange, reversal, skewing], parallelization, tiling, unrolling
-        if (isinstance(action,Parallelization)):
+        if (isinstance(action,Skewing)):
+            self.actions_mask[0:12] = 1
+            self.actions_mask[14:50] = 1
+
+
+        elif (isinstance(action,Parallelization)):
             self.actions_mask[0:12] = 1
 
         elif (isinstance(action,Tiling)) : 

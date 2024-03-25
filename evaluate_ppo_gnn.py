@@ -9,7 +9,7 @@ import json
 import os 
 
 
-NUM_ROLLOUT_WORKERS = 20
+NUM_ROLLOUT_WORKERS = 8
 
 
 def write_cpp_file(schedule_object):
@@ -39,11 +39,11 @@ if "__main__" == __name__:
     dataset_worker = DatasetActor.remote(Config.config.dataset)
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=172, num_outputs=56).to(
+    ppo_agent = GAT(input_size=36, num_heads=2, hidden_size=32, num_outputs=56).to(
         device
     )
 
-    ppo_agent.load_state_dict(torch.load("/scratch/dl5133/Dev/RL-Agent/new_agent/models/model_exec_training_with_init_103_70.pt", map_location=torch.device(device)))
+    ppo_agent.load_state_dict(torch.load("/scratch/dl5133/Dev/RL-Agent/new_agent/experiment_dir/models/model_exec_training_bench_gatv2_encoder_124.pt", map_location=torch.device(device)))
 
 
     rollout_workers = [

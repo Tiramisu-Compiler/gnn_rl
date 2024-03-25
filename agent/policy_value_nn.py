@@ -1,5 +1,5 @@
 from torch_geometric.nn import (
-    GATConv,
+    GATv2Conv,
     global_mean_pool,
     Linear,
     global_max_pool,
@@ -22,7 +22,7 @@ class GAT(nn.Module):
     ):
         super(GAT, self).__init__()
 
-        self.conv_layer1 = GATConv(
+        self.conv_layer1 = GATv2Conv(
             in_channels=input_size,
             out_channels=hidden_size,
             heads=num_heads,
@@ -31,7 +31,7 @@ class GAT(nn.Module):
             in_channels=hidden_size * num_heads,
             out_channels=hidden_size,
         )
-        self.conv_layer2 = GATConv(
+        self.conv_layer2 = GATv2Conv(
             in_channels=hidden_size,
             out_channels=hidden_size,
             heads=num_heads,
@@ -118,7 +118,8 @@ class GAT(nn.Module):
     def forward(self, data, actions_mask=None, action=None):
         weights = self.shared_layers(data)
         logits = self.π(weights)
-        logits = logits - actions_mask * 1e8
+        if actions_mask != None : 
+            logits = logits - actions_mask * 1e8
         probs = Categorical(logits=logits)
         if action == None:
             action = probs.sample()

@@ -256,7 +256,7 @@ def apply_flattened_action(
                 [its[loop_level], its[loop_level + 1]], [size_x, size_y], node_feats, it_index
             )
     elif action < 55:
-        factor = action - 50
+        factor = action - 49
         speedup, legality, actions_mask = tiramisu_api.unroll(
             unrolling_factor=2**factor, env_id=action, worker_id=worker_id
         )
@@ -324,7 +324,7 @@ class RolloutWorker:
 
         self.current_program = prog_infos[0]
 
-        self.actions_mask = actions_mask
+        self.actions_mask = torch.tensor(actions_mask)
         annotations = (
             self.tiramisu_api.scheduler_service.schedule_object.prog.annotations
         )
@@ -361,7 +361,7 @@ class RolloutWorker:
 
             with torch.no_grad():
                 action, action_log_prob, entropy, value = model(
-                    data, torch.tensor(self.actions_mask).to(device)
+                    data, self.actions_mask.to(device)
                 )
                 action = action.item()
                 action_log_prob = action_log_prob.item()
@@ -405,6 +405,9 @@ class RolloutWorker:
                 + f"\nActions Sequence So far : {self.tiramisu_api.scheduler_service.schedule_object.schedule_str}"
                 + "\n"
             )
+
+            if self.steps == 20 : 
+                done = True
 
         else:
             schedule_object = self.tiramisu_api.scheduler_service.schedule_object

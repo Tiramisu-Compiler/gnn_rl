@@ -93,8 +93,7 @@ def comps_to_vectors(annotations):
             raw_buffers = np.append(raw_buffers, read_access_matrix)
         raw_buffers = np.append(raw_buffers, -np.ones(702-raw_buffers.shape[0]))
         with torch.no_grad(): 
-            y = encoder.encoder1(torch.Tensor(raw_buffers))
-            encoded_buffers = encoder.encoder2(y).numpy()
+            encoded_buffers = encoder.encode(torch.Tensor(raw_buffers)).numpy()
         single_comp_vector[7:7+encoded_buffers.shape[0]] = encoded_buffers
         
         dict_comp[comp] = single_comp_vector

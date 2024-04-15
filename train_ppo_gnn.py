@@ -15,18 +15,18 @@ num_updates = 1000
 clip_epsilon = 0.3
 gamma = 0.99
 lambdaa = 0.95
-value_coeff = 2
-entropy_coeff_start = 0.01
+value_coeff = 4
+entropy_coeff_start = 0.1
 entropy_coeff_finish = 0
 max_grad_norm = 10
 batch_size = 4096
 num_epochs = 4
 mini_batch_size = 128
-start_lr = 1e-3
-final_lr = 1e-3
-weight_decay = 0.001
+start_lr = 1e-4
+final_lr = 1e-4
+weight_decay = 0.0001
 total_steps = num_updates * batch_size
-NUM_ROLLOUT_WORKERS = 7
+NUM_ROLLOUT_WORKERS = 8
 
 
 if "__main__" == __name__:
@@ -59,7 +59,7 @@ if "__main__" == __name__:
         for i in range(NUM_ROLLOUT_WORKERS)
     ]
 
-    run_name = "exec_training_bench_gatv2_encoder"
+    run_name = "exec_training_bench_gatv2_encoder_102"
 
     with mlflow.start_run(
         run_name=run_name,
@@ -94,7 +94,7 @@ if "__main__" == __name__:
             # entropy_coeff = entropy_coeff_finish
             entropy_coeff = entropy_coeff_finish - (
                 entropy_coeff_finish - entropy_coeff_start
-            ) * np.exp(-global_steps / total_steps)
+            ) * np.exp(-10*(global_steps / total_steps))
 
             num_steps = 0
             b_actions = torch.Tensor([]).to(device)

@@ -31,6 +31,8 @@ class PredictionService:
             except subprocess.TimeoutExpired as e:
                 schedule_object.prog.execution_times["initial_execution"] = None
                 return None
+            except ExecutingFunctionException as e :
+                return None
 
         return initial_execution
 

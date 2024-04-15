@@ -14,6 +14,7 @@ if __name__ == "__main__":
     try:
         # Select a program randomly for example program = "function025885"
         program: str = random.choice(programs)
+        program = "function_mvt_MEDIUM"
         print("Selected function : ", program)
         # set_program(str) creates all the necessary objects to start doing operations on a program
         # it returns an encoded representation specific to the RL system
@@ -50,18 +51,17 @@ if __name__ == "__main__":
             #     legality,
             #     actions_mask,
             # ) = tiramisu_api.reverse(loop_level=2, env_id=1)
-            # (
-            #     speedup,      
-            #     embedding_tensor,
-            #     legality,
-            #     actions_mask,
-            # ) = tiramisu_api.parallelize(loop_level=1, env_id=1)
-            (speedup, legality, actions_mask,
-            ) = tiramisu_api.unroll(unrolling_factor=32, env_id=7, worker_id="1")
+            (
+                speedup,      
+                legality,
+                actions_mask,
+            ) = tiramisu_api.parallelize(loop_level=0, env_id=1)
+            # (speedup, legality, actions_mask,
+            # ) = tiramisu_api.unroll(unrolling_factor=32, env_id=7, worker_id="1")
 
             # tiramisu_api.scheduler_service.next_branch()
-            # (speedup,
-            #  legality,actions_mask) = tiramisu_api.tile2D(loop_level1=1,loop_level2=2,size_x=12,size_y=12,env_id=4)
+            (speedup,
+             legality,actions_mask) = tiramisu_api.tile2D(loop_level1=0,loop_level2=1,size_x=32,size_y=64,env_id=4)
             # (speedup, embedding_tensor, legality, actions_mask,
             # ) = tiramisu_api.unroll(unrolling_factor=16, env_id=7)
 

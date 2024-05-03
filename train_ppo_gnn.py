@@ -35,6 +35,8 @@ if "__main__" == __name__:
 
     parser.add_argument("--num-nodes", default=1, type=int)
 
+    parser.add_argument("--name", type=str, default="experiment_101")
+
     args = parser.parse_args()
 
     NUM_ROLLOUT_WORKERS = args.num_nodes
@@ -49,7 +51,7 @@ if "__main__" == __name__:
     dataset_worker = DatasetActor.remote(Config.config.dataset)
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-    ppo_agent = GAT(input_size=36, num_heads=2, hidden_size=32, num_outputs=56).to(
+    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=128, num_outputs=56).to(
         device
     )
     optimizer = torch.optim.Adam(
@@ -71,7 +73,7 @@ if "__main__" == __name__:
         for i in range(NUM_ROLLOUT_WORKERS)
     ]
 
-    run_name = "exec_training_mediumdata_gatv2_encoder_102"
+    run_name = args.name
 
     with mlflow.start_run(
         run_name=run_name,

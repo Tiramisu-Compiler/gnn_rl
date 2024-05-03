@@ -1,7 +1,5 @@
 import numpy as np 
 import re
-import torch 
-from agent.buffer_encoder import encoder
 
 def isl_to_write_matrix(isl_map):
     comp_iterators_str = re.findall(r"\[(.*)\]\s*->", isl_map)[0]
@@ -20,10 +18,10 @@ def isl_to_write_matrix(isl_map):
 
 def iterators_to_vectors(annotations):
     it_dict = {}
-    iter_vector_size = 36
-    size_of_comp_vector = 27
+    iter_vector_size = 718
+    size_of_comp_vector = 709
     for it in annotations["iterators"]:
-        single_iter_vector = np.zeros(iter_vector_size)
+        single_iter_vector = -np.ones(iter_vector_size)
         single_iter_vector[0] = 0
         single_iter_vector[-9:] = 0
         # lower value
@@ -57,7 +55,7 @@ def encode_data_type(data_type):
 
 
 def comps_to_vectors(annotations):
-    comp_vector_size = 36
+    comp_vector_size = 718
     max_depth = 5
     dict_comp = {}
     for comp in annotations["computations"]:
@@ -76,9 +74,8 @@ def comps_to_vectors(annotations):
         write_matrix = isl_to_write_matrix(
             comp_dict["write_access_relation"]
         )
-        raw_buffers = np.array([])
         padded_matrix = pad_access_matrix(write_matrix, max_depth).reshape(-1)
-        raw_buffers = np.append(raw_buffers, padded_matrix)
+        single_comp_vector[7 : 7 + padded_matrix.shape[0]] = padded_matrix
         # We add vector of read access
         for index, read_access_dict in enumerate(comp_dict["accesses"]):
             read_access_matrix = pad_access_matrix(
@@ -90,12 +87,10 @@ def comps_to_vectors(annotations):
             read_access_matrix = np.append(
                 read_access_matrix, read_access_dict["buffer_id"] + 1
             )
-            raw_buffers = np.append(raw_buffers, read_access_matrix)
-        raw_buffers = np.append(raw_buffers, -np.ones(702-raw_buffers.shape[0]))
-        with torch.no_grad(): 
-            encoded_buffers = encoder.encode(torch.Tensor(raw_buffers)).numpy()
-        single_comp_vector[7:7+encoded_buffers.shape[0]] = encoded_buffers
-        
+            read_access_size = read_access_matrix.shape[0]
+            single_comp_vector[
+                49 + index * read_access_size : 49 + (index + 1) * read_access_size
+            ] = read_access_matrix
         dict_comp[comp] = single_comp_vector
     return dict_comp
 

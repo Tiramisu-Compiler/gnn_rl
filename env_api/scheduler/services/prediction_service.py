@@ -3,8 +3,8 @@ from env_api.scheduler.models.schedule import Schedule
 from env_api.utils.exceptions import ExecutingFunctionException
 import subprocess
 
-INIT_TIMEOUT = 5 * 20 * 60 + 4
-SLOWDOWN_TIMEOUT = 40
+INIT_TIMEOUT = 5 * 5 * 60 + 4
+SLOWDOWN_TIMEOUT = 20
 
 
 class PredictionService:

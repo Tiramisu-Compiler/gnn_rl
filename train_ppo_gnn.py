@@ -9,6 +9,7 @@ import numpy as np
 import ray
 import math
 from torch_geometric.data import Batch, Data
+import argparse as arg
 
 
 num_updates = 1000
@@ -26,11 +27,22 @@ start_lr = 1e-4
 final_lr = 1e-4
 weight_decay = 0.0001
 total_steps = num_updates * batch_size
-NUM_ROLLOUT_WORKERS = 8
+
 
 
 if "__main__" == __name__:
-    ray.init("auto")
+    parser = arg.ArgumentParser() 
+
+    parser.add_argument("--num-nodes", default=1, type=int)
+
+    args = parser.parse_args()
+
+    NUM_ROLLOUT_WORKERS = args.num_nodes
+
+    if NUM_ROLLOUT_WORKERS > 1 :
+        ray.init("auto")
+    else : 
+        ray.init()
     # Init global config to run the Tiramisu env
     Config.init()
 
@@ -59,7 +71,7 @@ if "__main__" == __name__:
         for i in range(NUM_ROLLOUT_WORKERS)
     ]
 
-    run_name = "exec_training_bench_gatv2_encoder_102"
+    run_name = "exec_training_mediumdata_gatv2_encoder_102"
 
     with mlflow.start_run(
         run_name=run_name,

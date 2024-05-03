@@ -10,10 +10,10 @@ env_vars:
 
 dataset:
     dataset_format: PICKLE
-    # cpps_path: /scratch/dl5133/Dev/RL-Agent/new_agent/dataset/medium_100k_cpps.pkl 
-    # dataset_path: /scratch/dl5133/Dev/RL-Agent/new_agent/dataset/medium_100k.pkl
-    cpps_path: /scratch/dl5133/Dev/RL-Agent/new_agent/dataset/cpps.pkl
-    dataset_path: /scratch/dl5133/Dev/RL-Agent/new_agent/dataset/new_data.pkl
+    cpps_path: /scratch/dl5133/Dev/RL-Agent/new_agent/dataset/medium_100k_cpps.pkl 
+    dataset_path: /scratch/dl5133/Dev/RL-Agent/new_agent/dataset/medium_100k.pkl
+    # cpps_path: /scratch/dl5133/Dev/RL-Agent/new_agent/dataset/cpps.pkl
+    # dataset_path: /scratch/dl5133/Dev/RL-Agent/new_agent/dataset/new_data.pkl
     save_path: /scratch/dl5133/Dev/RL-Agent/new_agent/dataset/
     shuffle: True
     seed: 13

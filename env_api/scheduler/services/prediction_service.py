@@ -33,6 +33,8 @@ class PredictionService:
                 return None
             except ExecutingFunctionException as e :
                 return None
+            except Exception as e :
+                return None
 
         return initial_execution
 
@@ -61,5 +63,8 @@ class PredictionService:
                 
             except subprocess.TimeoutExpired as e:
                 schedule_execution = initial_execution * SLOWDOWN_TIMEOUT
+            
+            except Exception as e :
+                raise ExecutingFunctionException
             
         return initial_execution / schedule_execution

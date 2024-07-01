@@ -12,3 +12,4 @@ dataset
 *.pkl
 
 *.yaml
+config/config.yaml

@@ -7,9 +7,7 @@ from utils.dataset_actor.dataset_actor import DatasetActor
 import ray
 import json
 import os
-
-
-NUM_ROLLOUT_WORKERS = 3
+import argparse as arg
 
 
 def write_cpp_file(schedule_object):
@@ -30,9 +28,17 @@ def write_cpp_file(schedule_object):
 
 if "__main__" == __name__:
 
-    full_log = ""
+    parser = arg.ArgumentParser() 
 
-    ray.init("auto")
+    parser.add_argument("--num-nodes", default=1, type=int)
+
+    args = parser.parse_args()
+
+    NUM_ROLLOUT_WORKERS = args.num_nodes
+
+    full_log = ""
+    ray.init()
+    # ray.init("auto")
     # ray.init()
     # Init global config to run the Tiramisu env
     Config.init()
@@ -40,21 +46,20 @@ if "__main__" == __name__:
     dataset_worker = DatasetActor.remote(Config.config.dataset)
     device = "cpu"
 
-    ppo_agent = GAT(input_size=36, num_heads=2, hidden_size=32, num_outputs=56).to(
+    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=198, num_outputs=56).to(
         device
     )
 
     ppo_agent.load_state_dict(
         torch.load(
-            "/scratch/dl5133/Dev/RL-Agent/new_agent/experiment_dir/models/model_exec_training_bench_gatv2_encoder_102_544.pt",
-            # "/scratch/dl5133/Dev/RL-Agent/new_agent/experiment_dir/models/model_exec_training_bench_gatv2_encoder_2_575.pt",
+            "/scratch/dl5133/Dev/RL-Agent/new_agent/experiment_dir/models/experiment_2.5k_101/model_experiment_2.5k_101_962.pt",
             map_location=torch.device(device),
         )
     )
 
     rollout_workers = [
         RolloutWorker.options(
-            num_cpus=28, num_gpus=0, scheduling_strategy="SPREAD"
+            num_cpus=10, num_gpus=0, scheduling_strategy="SPREAD"
         ).remote(dataset_worker, Config.config, worker_id=i)
         for i in range(NUM_ROLLOUT_WORKERS)
     ]

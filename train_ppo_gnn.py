@@ -11,21 +11,35 @@ import math
 from torch_geometric.data import Batch, Data
 import argparse as arg
 
+import os 
 
-num_updates = 1000
+def create_dir(run_name):
+    parent_dir = "/scratch/dl5133/Dev/RL-Agent/new_agent/experiment_dir/models"
+
+    path = os.path.join(parent_dir, run_name) 
+
+    try: 
+        os.makedirs(path, exist_ok = True) 
+    except OSError as error: 
+        pass
+
+    return path
+
+
+num_updates = 2000
 clip_epsilon = 0.3
 gamma = 0.99
 lambdaa = 0.95
 value_coeff = 4
 entropy_coeff_start = 0.1
-entropy_coeff_finish = 0
+entropy_coeff_finish = 0.0001
 max_grad_norm = 10
 batch_size = 4096
 num_epochs = 4
 mini_batch_size = 128
 start_lr = 1e-4
 final_lr = 1e-4
-weight_decay = 0.0001
+weight_decay = 0
 total_steps = num_updates * batch_size
 
 
@@ -39,6 +53,7 @@ if "__main__" == __name__:
 
     args = parser.parse_args()
 
+
     NUM_ROLLOUT_WORKERS = args.num_nodes
 
     if NUM_ROLLOUT_WORKERS > 1 :
@@ -51,7 +66,7 @@ if "__main__" == __name__:
     dataset_worker = DatasetActor.remote(Config.config.dataset)
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=128, num_outputs=56).to(
+    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=198, num_outputs=56).to(
         device
     )
     optimizer = torch.optim.Adam(
@@ -61,7 +76,7 @@ if "__main__" == __name__:
 
     # ppo_agent.load_state_dict(
     #     torch.load(
-    #         "/scratch/dl5133/Dev/RL-Agent/new_agent/models/model_exec_training_with_init_103_62.pt",
+    #         "/scratch/dl5133/Dev/RL-Agent/new_agent/experiment_dir/models/model_experiment_small_data_2316.pt",
     #         map_location=torch.device(device)
     #     ),
     # )
@@ -75,9 +90,11 @@ if "__main__" == __name__:
 
     run_name = args.name
 
+    model_save_path = create_dir(run_name)
+
     with mlflow.start_run(
         run_name=run_name,
-        # run_id="8f80a3b96ea04676928053f7fd90aa4d"
+        # run_id="5282bdf5c31d4996aecfc2b095971f6f"
     ) as run:
         mlflow.log_params(
             {
@@ -108,7 +125,7 @@ if "__main__" == __name__:
             # entropy_coeff = entropy_coeff_finish
             entropy_coeff = entropy_coeff_finish - (
                 entropy_coeff_finish - entropy_coeff_start
-            ) * np.exp(-10*(global_steps / total_steps))
+            ) * np.exp(-200*(global_steps / total_steps))
 
             num_steps = 0
             b_actions = torch.Tensor([]).to(device)
@@ -259,7 +276,7 @@ if "__main__" == __name__:
             speedups_mean = b_speedups.mean().item()
 
             if best_performance < speedups_mean:
-                torch.save(ppo_agent.state_dict(), f"./experiment_dir/models/model_{run_name}_{u}.pt")
+                torch.save(ppo_agent.state_dict(), f"{model_save_path}/model_{run_name}_{u}.pt")
                 best_performance = speedups_mean
 
             infos = {
@@ -280,3 +297,5 @@ if "__main__" == __name__:
         mlflow.end_run()
 
     ray.shutdown()
+
+

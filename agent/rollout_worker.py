@@ -322,6 +322,7 @@ class RolloutWorker:
             prog_infos = ray.get(self.dataset_worker.get_next_function.remote())
             actions_mask = self.tiramisu_api.set_program(*prog_infos)
 
+
         self.current_program = prog_infos[0]
 
         self.actions_mask = torch.tensor(actions_mask)
@@ -339,6 +340,7 @@ class RolloutWorker:
         self.previous_speedup = 1
         self.steps = 0
         self.state = (node_feats, edge_index, it_index)
+        self.previous_action = None
 
     def rollout(self, model: nn.Module, device: str):
         model.to(device)
@@ -406,7 +408,7 @@ class RolloutWorker:
                 + "\n"
             )
 
-            if self.steps == 20 : 
+            if self.steps == 40 : 
                 done = True
 
         else:
@@ -415,9 +417,9 @@ class RolloutWorker:
             tiramisu_program_dict = (
                 self.tiramisu_api.get_current_tiramisu_program_dict()
             )
-            self.dataset_worker.update_dataset.remote(
+            ray.get(self.dataset_worker.update_dataset.remote(
                 self.current_program, tiramisu_program_dict
-            )
+            ))
 
         return {
             "trajectory": trajectory,
@@ -427,17 +429,20 @@ class RolloutWorker:
         }
 
     def reward_process(self, action, legality, total_speedup):
-        switching_branch_penality = 0.9
-        illegal_action_penality = 0.9
-        max_speedup = np.inf
+        switching_branch_penality = 1
+        illegal_action_penality = 1
+        max_speedup = 50
         log_base = 4
 
         if legality:
             if action != 55:
                 # If the action is not Next
+                self.previous_action = action
                 instant_speedup = total_speedup / self.previous_speedup
                 self.previous_speedup = total_speedup
             else:
+                if self.previous_action ==  None : 
+                    instant_speedup = 0.8
                 instant_speedup = switching_branch_penality
         else:
             instant_speedup = illegal_action_penality

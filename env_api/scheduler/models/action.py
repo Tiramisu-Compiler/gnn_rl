@@ -208,3 +208,14 @@ class Tiling(Action):
 class Fusion(Action):
     def __init__(self, params: list, env_id: int = None, worker_id=""):
         super().__init__(params, name="Fusion", env_id=env_id, worker_id=worker_id)
+
+    # Fusion will fuse the current branch with the next one 
+    # I will try to implement it as long as it is legal 
+    # It takes no parameters 
+    # Before legality I need to generate the new .then tree
+    # If legal I should apply it to internal representations 
+
+    def get_fused_tree(self, branches, current_branch : int):
+        if ((current_branch + 1) > len(branches)):
+            return None
+        branches[current_branch]['annotations']['iterators']

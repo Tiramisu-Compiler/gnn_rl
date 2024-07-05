@@ -2,6 +2,7 @@ import numpy as np , copy
 from config.config import Config
 from env_api.core.models.tiramisu_program import TiramisuProgram
 from env_api.scheduler.models.action import *
+from pprint import pprint
 
 class Schedule:
     def __init__(self, program: TiramisuProgram):
@@ -25,7 +26,6 @@ class Schedule:
 
 
         if((type(self).__name__) == "Schedule"):
-            self.__calculate_common_it()
             self.__set_action_mask()
             self.__form_iterators_dict()
             self.__form_branches()
@@ -33,22 +33,6 @@ class Schedule:
             self.__set_action_mask()
             self.__form_iterators_dict()
 
-
-    def __calculate_common_it(self):
-        if len(self.comps) != 1:  # Multi-computation program
-            # comps_it is a list of lists of iterators of computations
-            comps_it = []
-            for comp in self.comps:
-                comps_it.append(
-                    self.prog.annotations["computations"][comp]["iterators"]
-                )
-            self.common_it = comps_it[0]
-            for comp_it in comps_it[1:]:
-                self.common_it = [it for it in comp_it if it in self.common_it]
-        else:  # A single comp program
-            self.common_it = self.prog.annotations["computations"][self.comps[0]][
-                "iterators"
-            ]
     
     def __set_action_mask(self):
         self.actions_mask = np.zeros(56)
@@ -65,6 +49,9 @@ class Schedule:
                 comp_it_dict[i]['upper_bound'] = self.prog.annotations['iterators'][
                     iterators[i]]['upper_bound']
             self.it_dict[comp] = comp_it_dict
+
+        # print(3 * "\n" + "The it dict")
+        # pprint(self.it_dict)
             
     def __form_branches(self):
         branches = []
@@ -108,6 +95,10 @@ class Schedule:
             branch["annotations"] = copy.deepcopy(branch_annotations)
 
         self.branches = branches
+
+        print(3 * "\n" + "Branches")
+        pprint(self.branches)
+
 
 
     def build_sched_string(self) -> str:

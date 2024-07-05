@@ -17,11 +17,13 @@ class PredictionService:
         else:
             try:
                 # We need to run the program to get the value
-                initial_execution = CompilingService.execute_code(
-                    tiramisu_program=schedule_object.prog,
-                    optims_list=[],
-                    timeout=INIT_TIMEOUT,
-                )
+                #TODO : Change it at the end of test 
+                initial_execution = 1
+                # initial_execution = CompilingService.execute_code(
+                #     tiramisu_program=schedule_object.prog,
+                #     optims_list=[],
+                #     timeout=INIT_TIMEOUT,
+                # )
                 if initial_execution:
                     schedule_object.prog.execution_times[
                         "initial_execution"
@@ -49,11 +51,13 @@ class PredictionService:
         else:
             try:
                 # We need to run the program to get the value
-                schedule_execution = CompilingService.execute_code(
-                    tiramisu_program=schedule_object.prog,
-                    optims_list=schedule_object.schedule_list,
-                    timeout=((initial_execution / 1000) * SLOWDOWN_TIMEOUT) * 5 + 4
-                )
+                #TODO : Change it at the end of test 
+                schedule_execution = 1
+                # schedule_execution = CompilingService.execute_code(
+                #     tiramisu_program=schedule_object.prog,
+                #     optims_list=schedule_object.schedule_list,
+                #     timeout=((initial_execution / 1000) * SLOWDOWN_TIMEOUT) * 5 + 4
+                # )
                 if schedule_execution:
                     schedule_object.prog.execution_times[
                         schedule_object.schedule_str

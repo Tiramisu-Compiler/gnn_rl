@@ -3,8 +3,13 @@ from config.config import Config
 from env_api.utils.exceptions import *
 import random, traceback, time
 from env_api.core.services.compiling_service import CompilingService
+from agent.graph_utils import build_graph
+from torch_geometric.data import Data
+import torch
+from agent.policy_value_nn import GAT
 
 if __name__ == "__main__":
+    torch.set_default_dtype(torch.float32)
     start = time.time()
     # Init global config to run the Tiramisu env
     Config.init()
@@ -14,7 +19,7 @@ if __name__ == "__main__":
     try:
         # Select a program randomly for example program = "function025885"
         program: str = random.choice(programs)
-        program = "function_mvt_MEDIUM"
+        # program = "function_mvt_MEDIUM"
         print("Selected function : ", program)
         # set_program(str) creates all the necessary objects to start doing operations on a program
         # it returns an encoded representation specific to the RL system
@@ -24,8 +29,6 @@ if __name__ == "__main__":
         if True:
             # After setting a program and checking if it is fully supported by our RL system, you can apply any action on it in any order
             # And expect to get the speedup of the whole schedule, the representation and the result of legality check of the last operation
-            
-
 
             # (speedup, embedding_tensor,
             #  legality,actions_mask) = tiramisu_api.skew(loop_level1=0,loop_level2=1,env_id=2)
@@ -51,8 +54,24 @@ if __name__ == "__main__":
             #     legality,
             #     actions_mask,
             # ) = tiramisu_api.reverse(loop_level=2, env_id=1)
+            n, e, i, c = build_graph(
+                tiramisu_api.scheduler_service.schedule_object.prog.annotations
+            )
+
+            data = Data(
+                x=torch.tensor(n, dtype=torch.float32),
+                edge_index=torch.tensor(e, dtype=torch.int)
+                .transpose(0, 1)
+                .contiguous(),
+            )
+
+            ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=198, num_outputs=56)
+
+            print(ppo_agent(data))
+            
+
             (
-                speedup,      
+                speedup,
                 legality,
                 actions_mask,
             ) = tiramisu_api.parallelize(loop_level=0, env_id=1)
@@ -60,18 +79,15 @@ if __name__ == "__main__":
             # ) = tiramisu_api.unroll(unrolling_factor=32, env_id=7, worker_id="1")
 
             # tiramisu_api.scheduler_service.next_branch()
-            (speedup,
-             legality,actions_mask) = tiramisu_api.tile2D(loop_level1=0,loop_level2=1,size_x=32,size_y=64,env_id=4)
+            # (speedup,
+            #  legality,actions_mask) = tiramisu_api.tile2D(loop_level1=0,loop_level2=1,size_x=32,size_y=64,env_id=4)
             # (speedup, embedding_tensor, legality, actions_mask,
             # ) = tiramisu_api.unroll(unrolling_factor=16, env_id=7)
-
-
 
             # # (speedup, embedding_tensor,
             # # legality,actions_mask) = tiramisu_api.tile3D(loop_level1=0 , loop_level2=1,loop_level3=2,
             # #     size_x=128,size_y=128,size_z=128,env_id=17)
             print("Speedup : ", speedup, " ", "Legality : ", legality)
-            
 
         print("Time : ", time.time() - start)
     except Exception as e:

@@ -65,6 +65,9 @@ eckpoint: str = ""
 class Experiment:
     legality_speedup: float = 1.0
     beam_search_order: bool = False
+    max_time_in_minutes: int = 5 
+    max_slowdown: int = 80
+
 
 @dataclass
 class EnvVars:

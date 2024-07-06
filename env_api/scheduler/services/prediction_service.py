@@ -2,9 +2,10 @@ from env_api.core.services.compiling_service import CompilingService
 from env_api.scheduler.models.schedule import Schedule
 from env_api.utils.exceptions import ExecutingFunctionException
 import subprocess
+from config.config import Config
 
-INIT_TIMEOUT = 5 * 5 * 60 + 4
-SLOWDOWN_TIMEOUT = 20
+INIT_TIMEOUT = 5 * Config.config.experiment.max_time_in_minutes * 60 + 4 # number of executions * minutes * seconds + seconds of starting the script
+SLOWDOWN_TIMEOUT = Config.config.experiment.max_slowdown
 
 
 class PredictionService:

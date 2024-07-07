@@ -83,10 +83,7 @@ class TiramisuEnvAPI:
         actions_mask = self.scheduler_service.set_schedule(
             schedule_object=schedule
         )
-        if Config.config.dataset.is_benchmark:
-            initial_exec = 1
-        else : 
-            initial_exec = self.scheduler_service.prediction_service.get_initial_time(schedule)
+        initial_exec = self.scheduler_service.prediction_service.get_initial_time(schedule)
         if not initial_exec:
             return None
 

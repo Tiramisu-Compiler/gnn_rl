@@ -39,7 +39,6 @@ class DatasetConfig:
     shuffle: bool = False
     seed: int = None
     saving_frequency: int = 10000
-    is_benchmark: bool =False
 
     def __init__(self, dataset_config_dict: Dict):
         self.dataset_format = DatasetFormat.from_string(
@@ -50,13 +49,6 @@ class DatasetConfig:
         self.shuffle = dataset_config_dict["shuffle"]
         self.seed = dataset_config_dict["seed"]
         self.saving_frequency = dataset_config_dict["saving_frequency"]
-        self.is_benchmark = dataset_config_dict["is_benchmark"]
-
-        if dataset_config_dict['is_benchmark']:
-            self.dataset_path = dataset_config_dict["benchmark_dataset_path"] if dataset_config_dict[
-                "benchmark_dataset_path"] else self.dataset_path
-            self.cpps_path = dataset_config_dict["benchmark_cpp_files"] if dataset_config_dict[
-                "benchmark_cpp_files"] else self.cpps_path
 
 eckpoint: str = ""
 
@@ -67,6 +59,10 @@ class Experiment:
     beam_search_order: bool = False
     max_time_in_minutes: int = 5 
     max_slowdown: int = 80
+
+@dataclass
+class Test:
+    skip_execute_schedules: bool = False
 
 
 @dataclass
@@ -84,6 +80,7 @@ class AutoSchedulerConfig:
     dataset: DatasetConfig
     experiment: Experiment
     env_vars: EnvVars
+    test: Test
 
 
     def __post_init__(self):
@@ -95,6 +92,8 @@ class AutoSchedulerConfig:
             self.experiment = Experiment(**self.experiment)
         if isinstance(self.env_vars, dict):
             self.env_vars = EnvVars(**self.env_vars)
+        if isinstance(self.test, dict):
+            self.test = Test(**self.test)
     
 
 
@@ -112,7 +111,8 @@ def dict_to_config(parsed_yaml: Dict[Any, Any]) -> AutoSchedulerConfig:
     dataset = DatasetConfig(parsed_yaml["dataset"])
     experiment = Experiment(**parsed_yaml["experiment"])
     env_vars = EnvVars(**parsed_yaml["env_vars"])
-    return AutoSchedulerConfig(tiramisu, dataset,  experiment, env_vars)
+    test = Test(**parsed_yaml["test"])
+    return AutoSchedulerConfig(tiramisu, dataset,  experiment, env_vars,test)
 
 
 class Config(object):

@@ -83,10 +83,8 @@ class SchedulerService:
         speedup = 1
         if legality_check:
             try : 
-                if (Config.config.dataset.is_benchmark):
-                    speedup = 1
-                else :
-                    speedup = self.prediction_service.get_real_speedup(schedule_object=self.schedule_object)
+                
+                speedup = self.prediction_service.get_real_speedup(schedule_object=self.schedule_object)
 
                 if isinstance(action, Tiling):
                     action.apply_on_branches(self.branches, self.schedule_object.schedule_list)

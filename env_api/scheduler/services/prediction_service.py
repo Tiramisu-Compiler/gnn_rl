@@ -4,12 +4,14 @@ from env_api.utils.exceptions import ExecutingFunctionException
 import subprocess
 from config.config import Config
 
-INIT_TIMEOUT = 5 * Config.config.experiment.max_time_in_minutes * 60 + 4 # number of executions * minutes * seconds + seconds of starting the script
-SLOWDOWN_TIMEOUT = Config.config.experiment.max_slowdown
+
 
 
 class PredictionService:
     def get_initial_time(self, schedule_object: Schedule):
+
+        INIT_TIMEOUT = 5 * Config.config.experiment.max_time_in_minutes * 60 + 4 # number of executions * minutes * seconds + seconds of starting the script
+
         if "initial_execution" in schedule_object.prog.execution_times:
             # Original execution time of the program already exists in the dataset so we read the value directly
             initial_execution = schedule_object.prog.execution_times[
@@ -18,13 +20,14 @@ class PredictionService:
         else:
             try:
                 # We need to run the program to get the value
-                #TODO : Change it at the end of test 
-                initial_execution = 1
-                # initial_execution = CompilingService.execute_code(
-                #     tiramisu_program=schedule_object.prog,
-                #     optims_list=[],
-                #     timeout=INIT_TIMEOUT,
-                # )
+                if Config.config.test.skip_execute_schedules :
+                    initial_execution = 1
+                else:
+                    initial_execution = CompilingService.execute_code(
+                        tiramisu_program=schedule_object.prog,
+                        optims_list=[],
+                        timeout=INIT_TIMEOUT,
+                    )
                 if initial_execution:
                     schedule_object.prog.execution_times[
                         "initial_execution"
@@ -42,6 +45,10 @@ class PredictionService:
         return initial_execution
 
     def get_real_speedup(self, schedule_object: Schedule):
+
+        SLOWDOWN_TIMEOUT = Config.config.experiment.max_slowdown
+
+        
         initial_execution = self.get_initial_time(schedule_object)
 
         if schedule_object.schedule_str in schedule_object.prog.execution_times:
@@ -52,13 +59,14 @@ class PredictionService:
         else:
             try:
                 # We need to run the program to get the value
-                #TODO : Change it at the end of test 
-                schedule_execution = 1
-                # schedule_execution = CompilingService.execute_code(
-                #     tiramisu_program=schedule_object.prog,
-                #     optims_list=schedule_object.schedule_list,
-                #     timeout=((initial_execution / 1000) * SLOWDOWN_TIMEOUT) * 5 + 4
-                # )
+                if Config.config.test.skip_execute_schedules :
+                    schedule_execution = 1
+                else:
+                    schedule_execution = CompilingService.execute_code(
+                        tiramisu_program=schedule_object.prog,
+                        optims_list=schedule_object.schedule_list,
+                        timeout=((initial_execution / 1000) * SLOWDOWN_TIMEOUT) * 5 + 4
+                    )
                 if schedule_execution:
                     schedule_object.prog.execution_times[
                         schedule_object.schedule_str

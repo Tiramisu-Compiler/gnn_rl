@@ -96,8 +96,8 @@ class Schedule:
 
         self.branches = branches
 
-        print(3 * "\n" + "Branches")
-        pprint(self.branches)
+        # print(3 * "\n" + "Branches")
+        # pprint(self.branches)
 
 
 

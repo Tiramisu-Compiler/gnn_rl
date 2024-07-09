@@ -115,7 +115,7 @@ if "__main__" == __name__:
                 "NUM_ROLLOUT_WORKERS": NUM_ROLLOUT_WORKERS,
             }
         )
-        best_performance = 0
+        best_performance = - np.inf
         global_steps = 0
         for u in range(num_updates):
             # optimizer.param_groups[0]["lr"] = final_lr - (final_lr - start_lr) * np.exp(

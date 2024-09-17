@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal
+from typing import Any, Dict
 import yaml
-import os
 
 # Enum for the dataset format
 
@@ -29,7 +28,6 @@ class TiramisuConfig:
     experiment_dir: str = ""
 
 
-
 @dataclass
 class DatasetConfig:
     dataset_format: DatasetFormat = DatasetFormat.HYBRID
@@ -39,11 +37,12 @@ class DatasetConfig:
     shuffle: bool = False
     seed: int = None
     saving_frequency: int = 10000
-    is_benchmark: bool =False
+    is_benchmark: bool = False
 
     def __init__(self, dataset_config_dict: Dict):
         self.dataset_format = DatasetFormat.from_string(
-            dataset_config_dict["dataset_format"])
+            dataset_config_dict["dataset_format"]
+        )
         self.cpps_path = dataset_config_dict["cpps_path"]
         self.dataset_path = dataset_config_dict["dataset_path"]
         self.save_path = dataset_config_dict["save_path"]
@@ -52,11 +51,18 @@ class DatasetConfig:
         self.saving_frequency = dataset_config_dict["saving_frequency"]
         self.is_benchmark = dataset_config_dict["is_benchmark"]
 
-        if dataset_config_dict['is_benchmark']:
-            self.dataset_path = dataset_config_dict["benchmark_dataset_path"] if dataset_config_dict[
-                "benchmark_dataset_path"] else self.dataset_path
-            self.cpps_path = dataset_config_dict["benchmark_cpp_files"] if dataset_config_dict[
-                "benchmark_cpp_files"] else self.cpps_path
+        if dataset_config_dict["is_benchmark"]:
+            self.dataset_path = (
+                dataset_config_dict["benchmark_dataset_path"]
+                if dataset_config_dict["benchmark_dataset_path"]
+                else self.dataset_path
+            )
+            self.cpps_path = (
+                dataset_config_dict["benchmark_cpp_files"]
+                if dataset_config_dict["benchmark_cpp_files"]
+                else self.cpps_path
+            )
+
 
 eckpoint: str = ""
 
@@ -66,22 +72,19 @@ class Experiment:
     legality_speedup: float = 1.0
     beam_search_order: bool = False
 
-@dataclass
-class EnvVars:
-    TIRAMISU_ROOT: str = ""
-    CONDA_ENV: str = ""
-    LD_LIBRARY_PATH: str = "${CONDA_ENV}/lib:${TIRAMISU_ROOT}/3rdParty/Halide/build/src:${TIRAMISU_ROOT}/3rdParty/llvm/build/lib:${TIRAMISU_ROOT}/3rdParty/isl/build/lib:"
 
+@dataclass
+class CodeDeps:
+    includes: list[str] = field(default_factory=list)
+    libs: list[str] = field(default_factory=list)
 
 
 @dataclass
 class AutoSchedulerConfig:
-
     tiramisu: TiramisuConfig
     dataset: DatasetConfig
     experiment: Experiment
-    env_vars: EnvVars
-
+    code_deps: CodeDeps
 
     def __post_init__(self):
         if isinstance(self.tiramisu, dict):
@@ -90,9 +93,8 @@ class AutoSchedulerConfig:
             self.dataset = DatasetConfig(self.dataset)
         if isinstance(self.experiment, dict):
             self.experiment = Experiment(**self.experiment)
-        if isinstance(self.env_vars, dict):
-            self.env_vars = EnvVars(**self.env_vars)
-    
+        if isinstance(self.code_deps, dict):
+            self.code_deps = CodeDeps(**self.code_deps)
 
 
 def read_yaml_file(path):
@@ -108,8 +110,8 @@ def dict_to_config(parsed_yaml: Dict[Any, Any]) -> AutoSchedulerConfig:
     tiramisu = TiramisuConfig(**parsed_yaml["tiramisu"])
     dataset = DatasetConfig(parsed_yaml["dataset"])
     experiment = Experiment(**parsed_yaml["experiment"])
-    env_vars = EnvVars(**parsed_yaml["env_vars"])
-    return AutoSchedulerConfig(tiramisu, dataset,  experiment, env_vars)
+    code_deps = CodeDeps(**parsed_yaml["code_deps"])
+    return AutoSchedulerConfig(tiramisu, dataset, experiment, code_deps)
 
 
 class Config(object):

@@ -1,3 +1,4 @@
+from pathlib import Path
 import mlflow
 import torch
 import torch.nn as nn
@@ -29,9 +30,8 @@ weight_decay = 0.0001
 total_steps = num_updates * batch_size
 
 
-
 if "__main__" == __name__:
-    parser = arg.ArgumentParser() 
+    parser = arg.ArgumentParser()
 
     parser.add_argument("--num-nodes", default=1, type=int)
 
@@ -41,9 +41,9 @@ if "__main__" == __name__:
 
     NUM_ROLLOUT_WORKERS = args.num_nodes
 
-    if NUM_ROLLOUT_WORKERS > 1 :
+    if NUM_ROLLOUT_WORKERS > 1:
         ray.init("auto")
-    else : 
+    else:
         ray.init()
     # Init global config to run the Tiramisu env
     Config.init()
@@ -58,6 +58,12 @@ if "__main__" == __name__:
         ppo_agent.parameters(), lr=start_lr, weight_decay=weight_decay, eps=1e-5
     )
     value_loss = nn.MSELoss()
+
+    # create dirs for saving models, outputs, and datasets
+    Path("./experiment_dir/models").mkdir(parents=True, exist_ok=True)
+    Path("./experiment_dir/outputs").mkdir(parents=True, exist_ok=True)
+    Path("./experiment_dir/datasets").mkdir(parents=True, exist_ok=True)
+    Path(Config.config.tiramisu.workspace).mkdir(parents=True, exist_ok=True)
 
     # ppo_agent.load_state_dict(
     #     torch.load(
@@ -108,7 +114,7 @@ if "__main__" == __name__:
             # entropy_coeff = entropy_coeff_finish
             entropy_coeff = entropy_coeff_finish - (
                 entropy_coeff_finish - entropy_coeff_start
-            ) * np.exp(-10*(global_steps / total_steps))
+            ) * np.exp(-10 * (global_steps / total_steps))
 
             num_steps = 0
             b_actions = torch.Tensor([]).to(device)
@@ -259,7 +265,10 @@ if "__main__" == __name__:
             speedups_mean = b_speedups.mean().item()
 
             if best_performance < speedups_mean:
-                torch.save(ppo_agent.state_dict(), f"./experiment_dir/models/model_{run_name}_{u}.pt")
+                torch.save(
+                    ppo_agent.state_dict(),
+                    f"./experiment_dir/models/model_{run_name}_{u}.pt",
+                )
                 best_performance = speedups_mean
 
             infos = {

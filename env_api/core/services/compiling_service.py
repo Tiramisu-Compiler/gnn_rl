@@ -1,9 +1,10 @@
 import subprocess
-import re, copy, logging
+import re
+import copy
+import logging
 from typing import List
 from env_api.core.models.tiramisu_program import TiramisuProgram
-from env_api.scheduler.models.action import Action, Parallelization, Tiling, Unrolling
-from env_api.scheduler.models.branch import Branch
+from env_api.scheduler.models.action import Action, Tiling, Unrolling
 from env_api.scheduler.models.schedule import Schedule
 from config.config import Config
 from pathlib import Path
@@ -17,9 +18,14 @@ class CompilingService:
         optims_list: List[Action],
     ):
         tiramisu_program = schedule_object.prog
-        output_path = f"{Config.config.tiramisu.workspace}{tiramisu_program.name}legal{optims_list[-1].worker_id}"
+        workspace = Path(Config.config.tiramisu.workspace)
+        output_path = (
+            workspace / f"{tiramisu_program.name}legal{optims_list[-1].worker_id}"
+        )
 
-        cpp_code = cls.get_legality_code(schedule_object=schedule_object, optims_list=optims_list)
+        cpp_code = cls.get_legality_code(
+            schedule_object=schedule_object, optims_list=optims_list
+        )
 
         return cls.run_cpp_code(cpp_code=cpp_code, output_path=output_path)
 
@@ -29,11 +35,12 @@ class CompilingService:
         schedule_object: Schedule,
         optims_list: List[Action],
     ):
-        
         cpp_code = schedule_object.prog.original_str
         comps_dict = {}
         for comp in schedule_object.prog.annotations["computations"]:
-            comps_dict[comp] = copy.deepcopy(schedule_object.prog.annotations["computations"][comp]["iterators"])
+            comps_dict[comp] = copy.deepcopy(
+                schedule_object.prog.annotations["computations"][comp]["iterators"]
+            )
         # Add code to the original file to get legality result
         legality_check_lines = """
         prepare_schedules_for_legality_checks(true);
@@ -44,12 +51,12 @@ class CompilingService:
         unrolling_legality = ""
         tiling_in_actions = False
 
-        for optim in optims_list :
-            if isinstance(optim, Unrolling): 
+        for optim in optims_list:
+            if isinstance(optim, Unrolling):
                 unrolling_legality += optim.legality_code_str
-            else : 
+            else:
                 legality_check_lines += optim.legality_code_str
-            
+
             if isinstance(optim, Tiling):
                 tiling_in_actions = True
                 loop_levels_size = len(optim.params) // 2
@@ -60,14 +67,11 @@ class CompilingService:
                             loop_levels_size + loop_index, f"t{loop_index}"
                         )
 
-
-        if (tiling_in_actions):
+        if tiling_in_actions:
             updated_fusion, cpp_code = cls.fuse_tiling_loops(
                 code=cpp_code, comps_dict=comps_dict
             )
             legality_check_lines += "\n\tclear_implicit_function_sched_graph();"
-        
-
 
         legality_check_lines += f"""
             {updated_fusion}
@@ -83,19 +87,19 @@ class CompilingService:
         )
         return cpp_code
 
-
     @classmethod
     def run_cpp_code(cls, cpp_code: str, output_path: str):
+        libs = ":".join(Config.config.code_deps.libs)
         shell_script = [
-            f"CONDA_ENV={Config.config.env_vars.CONDA_ENV}",
-
-            f"LD_LIBRARY_PATH={Config.config.env_vars.LD_LIBRARY_PATH}",
+            f"export LD_LIBRARY_PATH={libs}",
+            f"export LIBRARY_PATH={libs}",
+            f"export CPATH={':'.join(Config.config.code_deps.includes)}",
             # Compile intermidiate tiramisu file
-            "$CXX -I$TIRAMISU_ROOT/3rdParty/Halide/install/include -I$TIRAMISU_ROOT/include -I$TIRAMISU_ROOT/3rdParty/isl/include  -Wl,--no-as-needed -ldl -g -fno-rtti   -lpthread -fopenmp -std=c++17 -O0 -o {}.o -c -x c++ -".format(
+            "$CXX -Wl,--no-as-needed -ldl -g -fno-rtti -lpthread -fopenmp -std=c++17 -O0 -o {}.o -c -x c++ -".format(
                 output_path
             ),
             # Link generated file with executer
-            "$CXX -Wl,--no-as-needed -ldl -g -fno-rtti -lpthread -fopenmp -std=c++17 -O0 {}.o -o {}.out -L$TIRAMISU_ROOT/build  -L$TIRAMISU_ROOT/3rdParty/Halide/install/lib64  -L$TIRAMISU_ROOT/3rdParty/isl/build/lib  -Wl,-rpath,$TIRAMISU_ROOT/build:$TIRAMISU_ROOT/3rdParty/Halide/install/lib64:$TIRAMISU_ROOT/3rdParty/isl/build/lib -ltiramisu -ltiramisu_auto_scheduler -lHalide -lisl".format(
+            "$CXX -Wl,--no-as-needed -ldl -g -fno-rtti -lpthread -fopenmp -std=c++17 -O0 {}.o -o {}.out -ltiramisu -ltiramisu_auto_scheduler -lHalide -lisl".format(
                 output_path, output_path
             ),
             # Run the program
@@ -177,10 +181,8 @@ class CompilingService:
 
         solver_code = legality_cpp_code.replace(to_replace, solver_lines)
         output_path = (
-            Config.config.tiramisu.workspace
-            + schedule_object.prog.name
-            + "skew_solver"
-            + action.worker_id
+            Path(Config.config.tiramisu.workspace)
+            / f"{schedule_object.prog.name}skew_solver{action.worker_id}"
         )
         result_str = cls.run_cpp_code(cpp_code=solver_code, output_path=output_path)
         if not result_str:
@@ -273,19 +275,21 @@ class CompilingService:
         cpp_code = tiramisu_program.original_str
         comps_dict = {}
         for comp in tiramisu_program.annotations["computations"]:
-            comps_dict[comp] = copy.deepcopy(tiramisu_program.annotations["computations"][comp]["iterators"])
+            comps_dict[comp] = copy.deepcopy(
+                tiramisu_program.annotations["computations"][comp]["iterators"]
+            )
 
         updated_fusion = ""
         unrolling_updated = ""
         schedule_code = ""
         tiling_in_actions = False
 
-        for optim in optims_list :
-            if isinstance(optim, Unrolling): 
+        for optim in optims_list:
+            if isinstance(optim, Unrolling):
                 unrolling_updated += optim.execution_code_str
-            else : 
+            else:
                 schedule_code += optim.execution_code_str
-            
+
             if isinstance(optim, Tiling):
                 tiling_in_actions = True
                 loop_levels_size = len(optim.params) // 2
@@ -296,7 +300,7 @@ class CompilingService:
                             loop_levels_size + loop_index, f"t{loop_index}"
                         )
 
-        if (tiling_in_actions):
+        if tiling_in_actions:
             updated_fusion, cpp_code = cls.fuse_tiling_loops(
                 code=cpp_code, comps_dict=comps_dict
             )
@@ -328,14 +332,11 @@ class CompilingService:
         cls,
         tiramisu_program: TiramisuProgram,
         optims_list: List[Action],
-        timeout: int = None
+        timeout: int = None,
     ):
-
-        
-
-        if not optims_list: 
+        if not optims_list:
             worker = "init"
-        else : 
+        else:
             worker = str(optims_list[-1].worker_id)
 
         path = Path().joinpath(Config.config.tiramisu.workspace, worker)
@@ -352,14 +353,14 @@ class CompilingService:
 
         output_path = f"{str(path)}/{tiramisu_program.name}"
 
-        cpp_file_path = output_path + f"_schedule.cpp" 
+        cpp_file_path = output_path + "_schedule.cpp"
         with open(cpp_file_path, "w") as file:
             file.write(cpp_code)
 
         wrapper_cpp, wrapper_h = tiramisu_program.build_wrappers()
 
-        wrapper_cpp_path = output_path + f"_wrapper.cpp"
-        wrapper_h_path = output_path + f"_wrapper.h"
+        wrapper_cpp_path = output_path + "_wrapper.cpp"
+        wrapper_h_path = output_path + "_wrapper.h"
 
         with open(wrapper_cpp_path, "w") as file:
             file.write(wrapper_cpp)
@@ -372,21 +373,21 @@ class CompilingService:
 
         wrapper_exec = f"{tiramisu_program.name}_wrapper"
 
+        libs = ":".join(Config.config.code_deps.libs)
         shell_script = [
-            f"CONDA_ENV={Config.config.env_vars.CONDA_ENV}",
-
-            f"LD_LIBRARY_PATH={Config.config.env_vars.LD_LIBRARY_PATH}",            
-            "export LD_LIBRARY_PATH",
+            f"export LD_LIBRARY_PATH={libs}",
+            f"export LIBRARY_PATH={libs}",
+            f"export CPATH={':'.join(Config.config.code_deps.includes)}",
             f"cd {str(path)}",
             # Compile intermidiate tiramisu file
-            f"$CXX -I$TIRAMISU_ROOT/3rdParty/Halide/install/include -I$TIRAMISU_ROOT/include -I$TIRAMISU_ROOT/3rdParty/isl/include  -Wl,--no-as-needed -ldl -g -fno-rtti   -lpthread -fopenmp -std=c++17 -O0 -o {object_name} -c {cpp_file_path}",
+            f"$CXX -Wl,--no-as-needed -ldl -g -fno-rtti   -lpthread -fopenmp -std=c++17 -O0 -o {object_name} -c {cpp_file_path}",
             # Link generated file with executer
-            f"$CXX -Wl,--no-as-needed -ldl -g -fno-rtti -lpthread -fopenmp -std=c++17 -O0 {object_name} -o {out_name}  -L$TIRAMISU_ROOT/build  -L$TIRAMISU_ROOT/3rdParty/Halide/install/lib64  -L$TIRAMISU_ROOT/3rdParty/isl/build/lib  -Wl,-rpath,$TIRAMISU_ROOT/build:$TIRAMISU_ROOT/3rdParty/Halide/install/lib64:$TIRAMISU_ROOT/3rdParty/isl/build/lib -ltiramisu -ltiramisu_auto_scheduler -lHalide -lisl",
+            f"$CXX -Wl,--no-as-needed -ldl -g -fno-rtti -lpthread -fopenmp -std=c++17 -O0 {object_name} -o {out_name} -ltiramisu -ltiramisu_auto_scheduler -lHalide -lisl",
             # Run the generator
             f"./{out_name}",
             # compile the wrapper
             f"$CXX -shared -o {object_name}.so {object_name}",
-            f"$CXX -std=c++17 -fno-rtti -I$TIRAMISU_ROOT/include -I$TIRAMISU_ROOT/3rdParty/Halide/install/include -I$TIRAMISU_ROOT/3rdParty/isl/include/ -I$TIRAMISU_ROOT/benchmarks -L$TIRAMISU_ROOT/build -L$TIRAMISU_ROOT/3rdParty/Halide/install/lib64 -L$TIRAMISU_ROOT/3rdParty/isl/build/lib -o {wrapper_exec} -ltiramisu -lHalide -ldl -lpthread -fopenmp -lm -Wl,-rpath,$TIRAMISU_ROOT/build {wrapper_cpp_path} ./{object_name}.so -ltiramisu -lHalide -ldl -lpthread -fopenmp -lm -lisl",
+            f"$CXX -std=c++17 -fno-rtti -o {wrapper_exec} -ltiramisu -lHalide -ldl -lpthread -fopenmp -lm {wrapper_cpp_path} ./{object_name}.so -ltiramisu -lHalide -ldl -lpthread -fopenmp -lm -lisl",
         ]
 
         compiler = subprocess.run(
@@ -397,11 +398,9 @@ class CompilingService:
             check=True,
         )
         run_script = [
-            f"CONDA_ENV={Config.config.env_vars.CONDA_ENV}",
-
-            f"LD_LIBRARY_PATH={Config.config.env_vars.LD_LIBRARY_PATH}",
-
-            "export LD_LIBRARY_PATH",
+            f"export LD_LIBRARY_PATH={libs}",
+            f"export LIBRARY_PATH={libs}",
+            f"export CPATH={':'.join(Config.config.code_deps.includes)}",
             # cd to the workspace
             f"cd {str(path)}",
             # #  set the env variables
@@ -418,7 +417,7 @@ class CompilingService:
                 text=True,
                 shell=True,
                 check=True,
-                timeout=timeout
+                timeout=timeout,
             )
             numbers = compiler.stdout.split("\n")[-2].split(" ")[:-1]
             for i in range(len(numbers)):
@@ -431,7 +430,7 @@ class CompilingService:
             logging.error(f"Error output: {e.stderr}")
             logging.error(f"Output: {e.stdout}")
 
-        except subprocess.TimeoutExpired as e :
+        except subprocess.TimeoutExpired:
             logging.error("Timeout Error")
             raise subprocess.TimeoutExpired(compiler.args, timeout)
 
@@ -440,19 +439,21 @@ class CompilingService:
 
         # Deleting all files of the program
         subprocess.run(
-                [f"rm {output_path}*"],
-                capture_output=True,
-                text=True,
-                shell=True,
-                check=True,
-            )
+            [f"rm {output_path}*"],
+            capture_output=True,
+            text=True,
+            shell=True,
+            check=True,
+        )
         return execution_time
-
 
     @classmethod
     def compile_annotations(cls, tiramisu_program):
         # TODO : add getting tree structure object from executing the file instead of building it
-        output_path = Config.config.tiramisu.workspace + tiramisu_program.name + "annot"
+        # output_path = Config.config.tiramisu.workspace + tiramisu_program.name + "annot"
+        output_path = (
+            Path(Config.config.tiramisu.workspace) / f"{tiramisu_program.name}annot"
+        )
         # Add code to the original file to get json annotations
 
         get_json_lines = """

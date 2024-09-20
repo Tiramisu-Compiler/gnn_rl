@@ -17,7 +17,6 @@ class TiramisuEnvAPI:
         """
         self.local_dataset = local_dataset
         # Make the root to tiramisu root path explicit to the env in order to compile programs
-        os.environ["TIRAMISU_ROOT"] = Config.config.tiramisu.tiramisu_path
         # The services of the environment
         self.scheduler_service: SchedulerService = SchedulerService()
         self.tiramisu_service: TiramisuService = TiramisuService()

@@ -23,9 +23,8 @@ class DatasetFormat:
 
 @dataclass
 class TiramisuConfig:
-    tiramisu_path: str = ""
-    workspace: str = "./workspace/"
-    experiment_dir: str = ""
+    workspace: str = "./experiment_dir/workspace/"
+    experiment_dir: str = "./experiment_dir/"
 
 
 @dataclass

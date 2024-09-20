@@ -36,6 +36,7 @@ if "__main__" == __name__:
     parser.add_argument("--num-nodes", default=1, type=int)
 
     parser.add_argument("--name", type=str, default="experiment_101")
+    parser.add_argument("--cpus", type=str, default=2)
 
     args = parser.parse_args()
 
@@ -74,7 +75,7 @@ if "__main__" == __name__:
 
     rollout_workers = [
         RolloutWorker.options(
-            num_cpus=24, num_gpus=0, scheduling_strategy="SPREAD"
+            num_cpus=args.cpus, num_gpus=0, scheduling_strategy="SPREAD"
         ).remote(dataset_worker, Config.config, worker_id=i)
         for i in range(NUM_ROLLOUT_WORKERS)
     ]

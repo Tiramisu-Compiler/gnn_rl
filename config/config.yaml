@@ -1,26 +1,25 @@
 tiramisu:
-    tiramisu_path: path_to_tiramisu
-    workspace: path_to_compile_workspace
-    experiment_dir: path_to_experiment_dir
+    workspace: ./experiment_dir/workspace
+    experiment_dir: ./experiment_dir/
 
 code_deps:
     includes:
-        - 
+        - /home/ubuntu/install/include
     libs:
-        - 
+        - /home/ubuntu/install/lib
 
 dataset:
     dataset_format: PICKLE
-    cpps_path: path_to_cpp_files
-    dataset_path: path_to_dataset
-    save_path: path_to_save_dataset
+    cpps_path: ./data/cpps.pkl
+    dataset_path: ./data/data.pkl
+    save_path: ./experiment_dir/dataset
     shuffle: True
     seed: 13
     saving_frequency: 100
     # When doing evaluation on the benchmark set the value to True
     is_benchmark: False
-    benchmark_cpp_files: path_to_benchmark_cpp_files
-    benchmark_dataset_path: path_to_benchmark_dataset
+    benchmark_cpp_files: ./data/old_benchmark_cpps.pkl
+    benchmark_dataset_path: ./data/old_benchmark.pkl
     
 experiment:
     legality_speedup: 1.0

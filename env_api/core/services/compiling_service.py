@@ -371,6 +371,7 @@ class CompilingService:
         object_name = f"{tiramisu_program.name}.o"
         out_name = f"{tiramisu_program.name}.out"
         cpp_file_name = f"{tiramisu_program.name}_schedule.cpp"
+        wrapper_file_name = f"{tiramisu_program.name}_wrapper.cpp"
 
         wrapper_exec = f"{tiramisu_program.name}_wrapper"
 
@@ -388,16 +389,22 @@ class CompilingService:
             f"./{out_name}",
             # compile the wrapper
             f"$CXX -shared -o {object_name}.so {object_name}",
-            f"$CXX -std=c++17 -fno-rtti -o {wrapper_exec} -ltiramisu -lHalide -ldl -lpthread -fopenmp -lm {wrapper_cpp_path} ./{object_name}.so -ltiramisu -lHalide -ldl -lpthread -fopenmp -lm -lisl",
+            f"$CXX -std=c++17 -fno-rtti -o {wrapper_exec} -ltiramisu -lHalide -ldl -lpthread -fopenmp -lm {wrapper_file_name} ./{object_name}.so -ltiramisu -lHalide -ldl -lpthread -fopenmp -lm -lisl",
         ]
 
-        compiler = subprocess.run(
-            [" \n ".join(shell_script)],
-            capture_output=True,
-            text=True,
-            shell=True,
-            check=True,
-        )
+        try:
+            compiler = subprocess.run(
+                [" \n ".join(shell_script)],
+                capture_output=True,
+                text=True,
+                shell=True,
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Process terminated with error code: {e.returncode}")
+            logging.error(f"Error output: {e.stderr}")
+            logging.error(f"Output: {e.stdout}")
+
         run_script = [
             f"export LD_LIBRARY_PATH={libs}",
             f"export LIBRARY_PATH={libs}",

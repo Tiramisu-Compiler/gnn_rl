@@ -370,6 +370,7 @@ class CompilingService:
 
         object_name = f"{tiramisu_program.name}.o"
         out_name = f"{tiramisu_program.name}.out"
+        cpp_file_name = f"{tiramisu_program.name}_schedule.cpp"
 
         wrapper_exec = f"{tiramisu_program.name}_wrapper"
 
@@ -380,7 +381,7 @@ class CompilingService:
             f"export CPATH={':'.join(Config.config.code_deps.includes)}",
             f"cd {str(path)}",
             # Compile intermidiate tiramisu file
-            f"$CXX -Wl,--no-as-needed -ldl -g -fno-rtti   -lpthread -fopenmp -std=c++17 -O0 -o {object_name} -c {cpp_file_path}",
+            f"$CXX -Wl,--no-as-needed -ldl -g -fno-rtti   -lpthread -fopenmp -std=c++17 -O0 -o {object_name} -c {cpp_file_name}",
             # Link generated file with executer
             f"$CXX -Wl,--no-as-needed -ldl -g -fno-rtti -lpthread -fopenmp -std=c++17 -O0 {object_name} -o {out_name} -ltiramisu -ltiramisu_auto_scheduler -lHalide -lisl",
             # Run the generator

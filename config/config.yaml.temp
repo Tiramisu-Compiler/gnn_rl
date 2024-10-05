@@ -1,0 +1,26 @@
+tiramisu:
+    tiramisu_path: path to tiramisu root dir
+    workspace: a folder to save binary files of tiramisu
+    experiment_dir: a folder to save results of trainings
+
+env_vars:
+    CONDA_ENV: path to conda env
+    LD_LIBRARY_PATH: "${CONDA_ENV}/lib:${TIRAMISU_ROOT}/3rdParty/Halide/install/lib64:${TIRAMISU_ROOT}/3rdParty/llvm/build/lib:${TIRAMISU_ROOT}/3rdParty/isl/build/lib:"
+
+dataset:
+    dataset_format: PICKLE
+    cpps_path: dataset/cpps.pkl
+    dataset_path: dataset/schedules.pkl
+    save_path: dataset/
+    shuffle: True
+    seed: 133
+    saving_frequency: 10000
+
+experiment:
+    legality_speedup: 1.0
+    beam_search_order: True
+    max_time_in_minutes: 2
+    max_slowdown: 100
+
+test : 
+    skip_execute_schedules : False

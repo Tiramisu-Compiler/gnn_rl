@@ -1,7 +1,8 @@
 import re, random
 from env_api.utils.wrapper_code import WrappersCode
 
-class TiramisuProgram():
+
+class TiramisuProgram:
     def __init__(self, code: str):
         self.annotations = None
         self.comps = None
@@ -10,8 +11,42 @@ class TiramisuProgram():
         self.schedules_solver = {}
         self.execution_times = {}
         self.original_str = None
-        if (code):
+        if code:
+            code = """"#include <tiramisu/tiramisu.h>
+#include <tiramisu/auto_scheduler/evaluator.h>
+#include <tiramisu/auto_scheduler/search_method.h>
+#include "function_153_wrapper.h"
+
+using namespace tiramisu;
+
+int main(int argc, char **argv)
+{
+    tiramisu::init("function_153");
+
+   int c00(322), c01(130), c02(5);
+    var i00("i00", 0, c00) , i01("i01", 0, c01) , i02("i02", 0, c02) ;
+    
+    // computations
+    input input00("input00", {i00, i01, i02}, p_int32);
+    input input01("input01", {i02}, p_int32);
+
+    computation comp02("comp02", {i00, i01, i02}, p_int32);
+    comp02.set_expression(comp02(i00, i01, i02) + input00(i00, i01, i02) * input01(i02));
+    
+    // buffers
+    buffer buf02("buf02", {322, 130}, p_int32, a_output);
+    buffer buf00("buf00", {322, 130, 5}, p_int32, a_input);
+    buffer buf01("buf01", {5}, p_int32, a_input);
+
+    comp02.store_in(&buf02, {i00, i01});
+    input00.store_in(&buf00);
+    input01.store_in(&buf01);
+       
+    tiramisu::codegen({&buf02, &buf00, &buf01}, "./function_153.o");
+    return 0;
+}"""
             self.load_code_lines(original_str=code)
+            self.wrapper_cpp_code, self.wrapper_h_code = self.build_wrappers()
 
     # Since there is no factory constructors in python, I am creating this class method to replace the factory pattern
     @classmethod
@@ -20,45 +55,44 @@ class TiramisuProgram():
         tiramisu_prog = cls(None)
         tiramisu_prog.name = name
         tiramisu_prog.annotations = data["program_annotation"]
-        if (tiramisu_prog.annotations):
-            tiramisu_prog.comps = list(
-                tiramisu_prog.annotations["computations"].keys())
+        if tiramisu_prog.annotations:
+            tiramisu_prog.comps = list(tiramisu_prog.annotations["computations"].keys())
             tiramisu_prog.schedules_legality = data["schedules_legality"]
-            if (not "schedules_solver" in data ):
-                data["schedules_solver"]  = {}
-            tiramisu_prog.schedules_solver =  data["schedules_solver"] 
-            if ("execution_times" in data):
+            if not "schedules_solver" in data:
+                data["schedules_solver"] = {}
+            tiramisu_prog.schedules_solver = data["schedules_solver"]
+            if "execution_times" in data:
                 tiramisu_prog.execution_times = data["execution_times"]
 
         tiramisu_prog.load_code_lines(original_str)
+
+        # tiramisu_prog.wrapper_cpp_code, tiramisu_prog.wrapper_h_code = (
+        #     tiramisu_prog.build_wrappers()
+        # )
 
         # After taking the neccessary fields return the instance
         return tiramisu_prog
 
     def load_code_lines(self, original_str: str = None):
-        '''
+        """
         This function loads the file code , it is necessary to generate legality check code and annotations
-        '''
+        """
         if original_str:
             self.original_str = original_str
-        else :
+        else:
             return
 
-        self.body = re.findall(r'(tiramisu::init(?s:.)+)tiramisu::codegen',
-                               self.original_str)[0]
-        self.name = re.findall(r'tiramisu::init\(\"(\w+)\"\);',
-                               self.original_str)[0]
+        self.body = re.findall(
+            r"(tiramisu::init(?s:.)+)tiramisu::codegen", self.original_str
+        )[0]
+        self.name = re.findall(r"tiramisu::init\(\"(\w+)\"\);", self.original_str)[0]
         # Remove the wrapper include from the original string
         self.wrapper_str = f'#include "{self.name}_wrapper.h"'
-        if (self.wrapper_str in self.original_str ):
-            self.original_str = self.original_str.replace(
-                self.wrapper_str, f"// {self.wrapper_str}"
-            )
-        else :
-            self.original_str = self.original_str.replace(
-                "using namespace tiramisu;" , f"// {self.wrapper_str}\nusing namespace tiramisu;"
-            )
-            
+
+        self.original_str = self.original_str.replace(
+            self.wrapper_str, f"// {self.wrapper_str}"
+        )
+
         self.comps = re.findall(r"computation (\w+)\(", self.original_str)
         self.code_gen_line = re.findall(r"tiramisu::codegen\({.+;", self.original_str)[
             0
@@ -84,20 +118,31 @@ class TiramisuProgram():
         if tiramisu_program.name is None:
             raise Exception("TiramisuProgram.name is None")
 
-        wrapper_cpp_code = WrappersCode.wrapper_cpp_template.replace("$func_name$", tiramisu_program.name)
+        wrapper_cpp_code = WrappersCode.wrapper_cpp_template.replace(
+            "$func_name$", tiramisu_program.name
+        )
         wrapper_cpp_code = wrapper_cpp_code.replace(
             "$buffers_init$", buffers_init_lines
         )
-    
+
         wrapper_cpp_code = wrapper_cpp_code.replace(
             "$func_params$",
-            ",".join([name + ".raw_buffer()" for name in tiramisu_program.IO_buffer_names]),
+            ",".join(
+                [name + ".raw_buffer()" for name in tiramisu_program.IO_buffer_names]
+            ),
         )
 
-        wrapper_h_code = WrappersCode.wrapper_h_template.replace("$func_name$", tiramisu_program.name)
+        wrapper_h_code = WrappersCode.wrapper_h_template.replace(
+            "$func_name$", tiramisu_program.name
+        )
         wrapper_h_code = wrapper_h_code.replace(
             "$func_params$",
-            ",".join(["halide_buffer_t *" + name for name in tiramisu_program.IO_buffer_names]),
+            ",".join(
+                [
+                    "halide_buffer_t *" + name
+                    for name in tiramisu_program.IO_buffer_names
+                ]
+            ),
         )
 
         return wrapper_cpp_code, wrapper_h_code

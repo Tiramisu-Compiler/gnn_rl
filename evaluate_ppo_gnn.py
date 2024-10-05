@@ -37,29 +37,31 @@ if "__main__" == __name__:
     NUM_ROLLOUT_WORKERS = args.num_nodes
 
     full_log = ""
-    ray.init()
-    # ray.init("auto")
-    # ray.init()
+
+    if NUM_ROLLOUT_WORKERS > 1 :
+        ray.init("auto")
+    else : 
+        ray.init()
     # Init global config to run the Tiramisu env
     Config.init()
 
     dataset_worker = DatasetActor.remote(Config.config.dataset)
     device = "cpu"
 
-    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=198, num_outputs=56).to(
+    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=128, num_outputs=56).to(
         device
     )
 
     ppo_agent.load_state_dict(
         torch.load(
-            "/scratch/dl5133/Dev/RL-Agent/new_agent/experiment_dir/models/experiment_2.5k_101/model_experiment_2.5k_101_962.pt",
+            "/scratch/dl5133/Dev/RL-Agent/new_agent/experiment_dir/models/experiment_2k_101/last_model_1055.pt",
             map_location=torch.device(device),
         )
     )
 
     rollout_workers = [
         RolloutWorker.options(
-            num_cpus=10, num_gpus=0, scheduling_strategy="SPREAD"
+            num_cpus=24, num_gpus=0, scheduling_strategy="SPREAD"
         ).remote(dataset_worker, Config.config, worker_id=i)
         for i in range(NUM_ROLLOUT_WORKERS)
     ]

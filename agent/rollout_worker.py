@@ -320,7 +320,7 @@ class RolloutWorker:
         actions_mask = None
         while not isinstance(actions_mask, np.ndarray):
             prog_infos = ray.get(self.dataset_worker.get_next_function.remote())
-            actions_mask = self.tiramisu_api.set_program(*prog_infos)
+            actions_mask = self.tiramisu_api.set_program(*prog_infos, worker_id=str(self.worker_id))
 
 
         self.current_program = prog_infos[0]
@@ -431,7 +431,7 @@ class RolloutWorker:
     def reward_process(self, action, legality, total_speedup):
         switching_branch_penality = 1
         illegal_action_penality = 1
-        max_speedup = 50
+        max_speedup = np.inf
         log_base = 4
 
         if legality:
@@ -441,8 +441,6 @@ class RolloutWorker:
                 instant_speedup = total_speedup / self.previous_speedup
                 self.previous_speedup = total_speedup
             else:
-                if self.previous_action ==  None : 
-                    instant_speedup = 0.8
                 instant_speedup = switching_branch_penality
         else:
             instant_speedup = illegal_action_penality

@@ -31,15 +31,14 @@ clip_epsilon = 0.3
 gamma = 0.99
 lambdaa = 0.95
 value_coeff = 4
-entropy_coeff_start = 0.1
+entropy_coeff_start = 0.001
 entropy_coeff_finish = 0.0001
 max_grad_norm = 10
 batch_size = 4096
-num_epochs = 4
+num_epochs = 5
 mini_batch_size = 128
-start_lr = 1e-4
-final_lr = 1e-4
-weight_decay = 0
+lr = 5e-4
+weight_decay = 0.0001
 total_steps = num_updates * batch_size
 
 
@@ -66,20 +65,20 @@ if "__main__" == __name__:
     dataset_worker = DatasetActor.remote(Config.config.dataset)
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=198, num_outputs=56).to(
+    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=128, num_outputs=56).to(
         device
     )
     optimizer = torch.optim.Adam(
-        ppo_agent.parameters(), lr=start_lr, weight_decay=weight_decay, eps=1e-5
+        ppo_agent.parameters(), lr=lr, weight_decay=weight_decay, eps=1e-8
     )
     value_loss = nn.MSELoss()
 
-    # ppo_agent.load_state_dict(
-    #     torch.load(
-    #         "/scratch/dl5133/Dev/RL-Agent/new_agent/experiment_dir/models/model_experiment_small_data_2316.pt",
-    #         map_location=torch.device(device)
-    #     ),
-    # )
+    ppo_agent.load_state_dict(
+        torch.load(
+            "/scratch/dl5133/Dev/RL-Agent/new_agent/experiment_dir/models/experiment_2k_101/last_model_168.pt",
+            map_location=torch.device(device)
+        ),
+    )
 
     rollout_workers = [
         RolloutWorker.options(
@@ -94,33 +93,30 @@ if "__main__" == __name__:
 
     with mlflow.start_run(
         run_name=run_name,
-        # run_id="5282bdf5c31d4996aecfc2b095971f6f"
+        run_id="3f83032459e946d5b5a6397e266e5b29"
     ) as run:
         mlflow.log_params(
             {
-                "num_updates": num_updates,
-                "clip_epsilon": clip_epsilon,
-                "gamma": gamma,
-                "lambdaa": lambdaa,
-                "value_coeff": value_coeff,
-                "entropy_coeff_start": entropy_coeff_start,
-                "entropy_coeff_finish": entropy_coeff_finish,
-                "max_grad_norm": max_grad_norm,
-                "batch_size": batch_size,
-                "num_epochs": num_epochs,
-                "mini_batch_size": mini_batch_size,
-                "start_lr": start_lr,
-                "final_lr": final_lr,
-                "weight_decay": weight_decay,
-                "NUM_ROLLOUT_WORKERS": NUM_ROLLOUT_WORKERS,
+                # "num_updates": num_updates,
+                # "clip_epsilon": clip_epsilon,
+                # "gamma": gamma,
+                # "lambdaa": lambdaa,
+                # "value_coeff": value_coeff,
+                # "entropy_coeff_start": entropy_coeff_start,
+                # "entropy_coeff_finish": entropy_coeff_finish,
+                # "max_grad_norm": max_grad_norm,
+                # "batch_size": batch_size,
+                # "num_epochs": num_epochs,
+                # "mini_batch_size": mini_batch_size,
+                # "lr": lr,
+                # "weight_decay": weight_decay,
+                # "NUM_ROLLOUT_WORKERS": NUM_ROLLOUT_WORKERS,
             }
         )
         best_performance = - np.inf
-        global_steps = 0
-        for u in range(num_updates):
-            # optimizer.param_groups[0]["lr"] = final_lr - (final_lr - start_lr) * np.exp(
-            #     -2 * u / num_updates
-            # )
+        global_steps = 686651
+        for u in range(168,num_updates+1):
+            optimizer.param_groups[0]["lr"] = optimizer.param_groups[0]["lr"] - (lr/(num_updates+100))
 
             # entropy_coeff = entropy_coeff_finish
             entropy_coeff = entropy_coeff_finish - (
@@ -275,8 +271,11 @@ if "__main__" == __name__:
 
             speedups_mean = b_speedups.mean().item()
 
+            torch.save(ppo_agent.state_dict(), f"{model_save_path}/last_model_{u}.pt")
+            if (u - 168) >= 10 : 
+                os.remove(f"{model_save_path}/last_model_{u-10}.pt")
             if best_performance < speedups_mean:
-                torch.save(ppo_agent.state_dict(), f"{model_save_path}/model_{run_name}_{u}.pt")
+                torch.save(ppo_agent.state_dict(), f"{model_save_path}/best_model_{u}.pt")
                 best_performance = speedups_mean
 
             infos = {
@@ -288,6 +287,7 @@ if "__main__" == __name__:
                 "Reward min": b_speedups.min().item(),
                 "Reward max": b_speedups.max().item(),
                 "Episode length mean": avg_episode_length,
+                "Learning rate" : optimizer.param_groups[0]["lr"],
             }
             print(infos)
             mlflow.log_metrics(

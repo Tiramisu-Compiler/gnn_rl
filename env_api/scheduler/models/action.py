@@ -9,6 +9,8 @@ class Action:
         comps: list = [],
         env_id: int = None,
         worker_id="",
+        loops=[],
+        factors=[],
     ):
         self.params = params
         self.name = name
@@ -22,18 +24,22 @@ class Action:
 
         self.legality_code_str = ""
         self.execution_code_str = ""
-
         self.comps_schedule = {}
-    
+        self.loops: int = loops
+        self.factors: int = factors
+
     def set_comps(self, comps):
         self.comps = comps
 
-    def apply_on_branches(self, branches ):
+    def set_impacted_branches(self, branches):
+        self.impacted_brs = branches
+
+    def apply_on_branches(self, branches):
         for comp in self.comps:
-            for branch in branches : 
+            for branch in branches:
                 # Check for the branches that needs to be updated
-                if (comp in branch.comps):
-                    # Update the actions mask 
+                if comp in branch.comps:
+                    # Update the actions mask
                     branch.update_actions_mask(action=self)
 
 
@@ -76,7 +82,7 @@ class Interchange(AffineAction):
 
     def set_comps(self, comps):
         super().set_comps(comps)
-        loop_level1 , loop_level2 = self.params
+        loop_level1, loop_level2 = self.params
         optim_str = ""
         for comp in self.comps:
             self.comps_schedule[comp] = f"I(L{loop_level1},L{loop_level2})"
@@ -98,16 +104,22 @@ class Skewing(AffineAction):
         loop_level1, loop_level2, factor1, factor2 = self.params
         optim_str = ""
         for comp in self.comps:
-            self.comps_schedule[comp] = f"S(L{loop_level1},L{loop_level2},{factor1},{factor2})"
-            optim_str += f"\n\t{comp}.skew({loop_level1}, {loop_level2}, {factor1}, {factor2});"
-        
+            self.comps_schedule[comp] = (
+                f"S(L{loop_level1},L{loop_level2},{factor1},{factor2})"
+            )
+            optim_str += (
+                f"\n\t{comp}.skew({loop_level1}, {loop_level2}, {factor1}, {factor2});"
+            )
+
         self.legality_code_str = self.execution_code_str = optim_str
+
 
 class Parallelization(Action):
     def __init__(self, params: list, env_id: int = None, worker_id=""):
         super().__init__(
             params, name="Parallelization", env_id=env_id, worker_id=worker_id
         )
+
     def set_comps(self, comps):
         super().set_comps(comps)
 
@@ -115,18 +127,14 @@ class Parallelization(Action):
 
         for comp in self.comps:
             self.comps_schedule[comp] = f"P(L{loop_level})"
-        
+
         comp = self.comps[0]
 
         self.execution_code_str = f"\n\t{comp}.tag_parallel_level({loop_level});"
-        
-        self.legality_code_str = (
-        f"""\n\tprepare_schedules_for_legality_checks(true);
-        is_legal &= loop_parallelization_is_legal({loop_level}, {{&{",&".join(self.comps)}}});
+
+        self.legality_code_str = f"""is_legal &= loop_parallelization_is_legal({loop_level}, {{&{",&".join(self.comps)}}});
         {self.execution_code_str}
         """
-        )
-        
 
 
 class Unrolling(Action):
@@ -136,7 +144,7 @@ class Unrolling(Action):
     def set_comps(self, comps):
         super().set_comps(comps)
 
-        loop_level , factor = self.params
+        loop_level, factor = self.params
         optim_str = ""
         for comp in self.comps:
             self.comps_schedule[comp] = f"U(L{loop_level},{factor})"
@@ -144,15 +152,12 @@ class Unrolling(Action):
 
         self.execution_code_str = optim_str
 
-        self.legality_code_str = (
-        f"""\n\tprepare_schedules_for_legality_checks(true);
-        is_legal &= loop_unrolling_is_legal({loop_level}, {{&{",&".join(self.comps)}}});
+        self.legality_code_str = f"""is_legal &= loop_unrolling_is_legal({loop_level}, {{&{",&".join(self.comps)}}});
         {self.execution_code_str}
         """
-        )
 
     def set_params(self, additional_loops):
-        loop_level , factor = self.params
+        loop_level, factor = self.params
         loop_level += additional_loops
         optim_str = ""
         for comp in self.comps:
@@ -161,26 +166,31 @@ class Unrolling(Action):
 
         self.execution_code_str = optim_str
 
-        self.legality_code_str = (
-        f"""\n\tprepare_schedules_for_legality_checks(true);
-        is_legal &= loop_unrolling_is_legal({loop_level}, {{&{",&".join(self.comps)}}});
+        self.legality_code_str = f"""is_legal &= loop_unrolling_is_legal({loop_level}, {{&{",&".join(self.comps)}}});
         {self.execution_code_str}
         """
-        )       
 
-    def apply_on_branches(self, branches, current_branch : int ):
+    def apply_on_branches(self, branches, current_branch: int):
         branches[current_branch].update_actions_mask(action=self)
 
 
-
 class Tiling(Action):
-    def __init__(self, params: list, env_id: int = None, worker_id=""):
-        super().__init__(params, name="Tiling", env_id=env_id, worker_id=worker_id)
+    def __init__(
+        self, params: list, env_id: int = None, worker_id="", loops=[], factors=[]
+    ):
+        super().__init__(
+            params,
+            name="Tiling",
+            env_id=env_id,
+            worker_id=worker_id,
+            loops=loops,
+            factors=factors,
+        )
 
     def set_comps(self, comps):
         super().set_comps(comps)
 
-        size = len(self.params)//2
+        size = len(self.params) // 2
         loop_args = "".join([f"L{c}," for c in self.params[:size]])
         factor_args = ",".join([f"{c}" for c in self.params[size:]])
         optim_str = ""
@@ -191,31 +201,32 @@ class Tiling(Action):
         self.execution_code_str = self.legality_code_str = optim_str
 
     def apply_on_branches(self, branches, schedule_list: List[Action]):
-        tiling_depth = len(self.params)//2
+        tiling_depth = len(self.params) // 2
         for comp in self.comps:
-            for branch in branches : 
+            for branch in branches:
                 # Check for the branches that needs to be updated
-                if (comp in branch.comps):
-                    # Update the actions mask 
+                if comp in branch.comps:
+                    # Update the actions mask
                     branch.update_actions_mask(action=self)
                     branch.additional_loops = tiling_depth
 
-            for optim in schedule_list: 
+            for optim in schedule_list:
                 if isinstance(optim, Unrolling):
                     if comp in optim.comps:
                         optim.set_params(additional_loops=tiling_depth)
+
 
 class Fusion(Action):
     def __init__(self, params: list, env_id: int = None, worker_id=""):
         super().__init__(params, name="Fusion", env_id=env_id, worker_id=worker_id)
 
-    # Fusion will fuse the current branch with the next one 
-    # I will try to implement it as long as it is legal 
-    # It takes no parameters 
+    # Fusion will fuse the current branch with the next one
+    # I will try to implement it as long as it is legal
+    # It takes no parameters
     # Before legality I need to generate the new .then tree
-    # If legal I should apply it to internal representations 
+    # If legal I should apply it to internal representations
 
-    def get_fused_tree(self, branches, current_branch : int):
-        if ((current_branch + 1) > len(branches)):
+    def get_fused_tree(self, branches, current_branch: int):
+        if (current_branch + 1) > len(branches):
             return None
-        branches[current_branch]['annotations']['iterators']
+        branches[current_branch]["annotations"]["iterators"]

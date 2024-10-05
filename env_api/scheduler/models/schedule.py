@@ -2,7 +2,6 @@ import numpy as np , copy
 from config.config import Config
 from env_api.core.models.tiramisu_program import TiramisuProgram
 from env_api.scheduler.models.action import *
-from pprint import pprint
 
 class Schedule:
     def __init__(self, program: TiramisuProgram):
@@ -10,14 +9,12 @@ class Schedule:
         self.prog = program
         # List of computations of the program
         self.comps = self.prog.comps
-        # Iterators dictionnary
-        self.it_dict = {}
         # List of branches of the program tree
         self.branches = []
         # List of common iterators
         self.common_it = []
         # self.schedule_list is an array that contains a list of optimizations that has been applied on the program
-        # This list has objects of type `OptimizationCommand`
+        # This list has objects of type `Action`
         self.schedule_list = []
         # Additional loops when Tiling is applied
         self.additional_loops = 0
@@ -27,31 +24,13 @@ class Schedule:
 
         if((type(self).__name__) == "Schedule"):
             self.__set_action_mask()
-            self.__form_iterators_dict()
             self.__form_branches()
         else : 
             self.__set_action_mask()
-            self.__form_iterators_dict()
 
     
     def __set_action_mask(self):
         self.actions_mask = np.zeros(56)
-
-    def __form_iterators_dict(self):
-        for comp in self.comps:
-            comp_it_dict = {}
-            iterators = list(self.prog.annotations["computations"][comp]["iterators"])
-            for i in range(len(iterators)):
-                comp_it_dict[i] = {}
-                comp_it_dict[i]['iterator'] = iterators[i]
-                comp_it_dict[i]['lower_bound'] = self.prog.annotations['iterators'][
-                    iterators[i]]['lower_bound']
-                comp_it_dict[i]['upper_bound'] = self.prog.annotations['iterators'][
-                    iterators[i]]['upper_bound']
-            self.it_dict[comp] = comp_it_dict
-
-        # print(3 * "\n" + "The it dict")
-        # pprint(self.it_dict)
             
     def __form_branches(self):
         branches = []

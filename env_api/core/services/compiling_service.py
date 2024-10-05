@@ -1,6 +1,6 @@
 import subprocess
 import re, copy, logging
-from typing import List
+from typing import List, Union
 from env_api.core.models.tiramisu_program import TiramisuProgram
 from env_api.scheduler.models.action import Action, Parallelization, Tiling, Unrolling
 from env_api.scheduler.models.branch import Branch
@@ -15,11 +15,24 @@ class CompilingService:
         cls,
         schedule_object: Schedule,
         optims_list: List[Action],
+        worker_id: Union[str, None],
     ):
-        tiramisu_program = schedule_object.prog
-        output_path = f"{Config.config.tiramisu.workspace}{tiramisu_program.name}legal{optims_list[-1].worker_id}"
+        if worker_id != None:
+            worker = worker_id
+        else:
+            worker = str(optims_list[-1].worker_id)
 
-        cpp_code = cls.get_legality_code(schedule_object=schedule_object, optims_list=optims_list)
+        tiramisu_program = schedule_object.prog
+        path = Path().joinpath(Config.config.tiramisu.workspace, worker)
+
+        output_path = f"{str(path)}/{tiramisu_program.name}legal"
+
+        if not path.exists():
+            path.mkdir(parents=True)
+
+        cpp_code = cls.get_legality_code(
+            schedule_object=schedule_object, optims_list=optims_list
+        )
 
         return cls.run_cpp_code(cpp_code=cpp_code, output_path=output_path)
 
@@ -29,11 +42,13 @@ class CompilingService:
         schedule_object: Schedule,
         optims_list: List[Action],
     ):
-        
+
         cpp_code = schedule_object.prog.original_str
         comps_dict = {}
         for comp in schedule_object.prog.annotations["computations"]:
-            comps_dict[comp] = copy.deepcopy(schedule_object.prog.annotations["computations"][comp]["iterators"])
+            comps_dict[comp] = copy.deepcopy(
+                schedule_object.prog.annotations["computations"][comp]["iterators"]
+            )
         # Add code to the original file to get legality result
         legality_check_lines = """
         prepare_schedules_for_legality_checks(true);
@@ -44,12 +59,12 @@ class CompilingService:
         unrolling_legality = ""
         tiling_in_actions = False
 
-        for optim in optims_list :
-            if isinstance(optim, Unrolling): 
+        for optim in optims_list:
+            if isinstance(optim, Unrolling):
                 unrolling_legality += optim.legality_code_str
-            else : 
+            else:
                 legality_check_lines += optim.legality_code_str
-            
+
             if isinstance(optim, Tiling):
                 tiling_in_actions = True
                 loop_levels_size = len(optim.params) // 2
@@ -60,14 +75,11 @@ class CompilingService:
                             loop_levels_size + loop_index, f"t{loop_index}"
                         )
 
-
-        if (tiling_in_actions):
+        if tiling_in_actions:
             updated_fusion, cpp_code = cls.fuse_tiling_loops(
                 code=cpp_code, comps_dict=comps_dict
             )
             legality_check_lines += "\n\tclear_implicit_function_sched_graph();"
-        
-
 
         legality_check_lines += f"""
             {updated_fusion}
@@ -83,12 +95,10 @@ class CompilingService:
         )
         return cpp_code
 
-
     @classmethod
     def run_cpp_code(cls, cpp_code: str, output_path: str):
         shell_script = [
             f"CONDA_ENV={Config.config.env_vars.CONDA_ENV}",
-
             f"LD_LIBRARY_PATH={Config.config.env_vars.LD_LIBRARY_PATH}",
             # Compile intermidiate tiramisu file
             "$CXX -I$TIRAMISU_ROOT/3rdParty/Halide/install/include -I$TIRAMISU_ROOT/include -I$TIRAMISU_ROOT/3rdParty/isl/include  -Wl,--no-as-needed -ldl -g -fno-rtti   -lpthread -fopenmp -std=c++17 -O0 -o {}.o -c -x c++ -".format(
@@ -122,7 +132,14 @@ class CompilingService:
             return "0"
 
     @classmethod
-    def call_skewing_solver(cls, schedule_object, optim_list, action: Action):
+    def call_skewing_solver(
+        cls, schedule_object, optim_list, action: Action, worker_id: Union[str, None]
+    ):
+        if worker_id != None:
+            worker = worker_id
+        else:
+            worker = str(action.worker_id)
+
         params = action.params
         legality_cpp_code = cls.get_legality_code(schedule_object, optim_list)
         to_replace = re.findall(r"std::cout << is_legal;", legality_cpp_code)[0]
@@ -176,12 +193,14 @@ class CompilingService:
             """
 
         solver_code = legality_cpp_code.replace(to_replace, solver_lines)
-        output_path = (
-            Config.config.tiramisu.workspace
-            + schedule_object.prog.name
-            + "skew_solver"
-            + action.worker_id
-        )
+
+        path = Path().joinpath(Config.config.tiramisu.workspace, worker)
+
+        output_path = f"{str(path)}/{schedule_object.prog.name}skew_solver"
+
+        if not path.exists():
+            path.mkdir(parents=True)
+
         result_str = cls.run_cpp_code(cpp_code=solver_code, output_path=output_path)
         if not result_str:
             return None
@@ -273,19 +292,21 @@ class CompilingService:
         cpp_code = tiramisu_program.original_str
         comps_dict = {}
         for comp in tiramisu_program.annotations["computations"]:
-            comps_dict[comp] = copy.deepcopy(tiramisu_program.annotations["computations"][comp]["iterators"])
+            comps_dict[comp] = copy.deepcopy(
+                tiramisu_program.annotations["computations"][comp]["iterators"]
+            )
 
         updated_fusion = ""
         unrolling_updated = ""
         schedule_code = ""
         tiling_in_actions = False
 
-        for optim in optims_list :
-            if isinstance(optim, Unrolling): 
+        for optim in optims_list:
+            if isinstance(optim, Unrolling):
                 unrolling_updated += optim.execution_code_str
-            else : 
+            else:
                 schedule_code += optim.execution_code_str
-            
+
             if isinstance(optim, Tiling):
                 tiling_in_actions = True
                 loop_levels_size = len(optim.params) // 2
@@ -296,7 +317,7 @@ class CompilingService:
                             loop_levels_size + loop_index, f"t{loop_index}"
                         )
 
-        if (tiling_in_actions):
+        if tiling_in_actions:
             updated_fusion, cpp_code = cls.fuse_tiling_loops(
                 code=cpp_code, comps_dict=comps_dict
             )
@@ -327,15 +348,13 @@ class CompilingService:
     def execute_code(
         cls,
         tiramisu_program: TiramisuProgram,
-        optims_list: List[Action],
-        timeout: int = None
+        optims_list: Union[List[Action], None],
+        worker_id: Union[str, None],
+        timeout: int = None,
     ):
-
-        
-
-        if not optims_list: 
-            worker = "init"
-        else : 
+        if worker_id != None:
+            worker = worker_id
+        else:
             worker = str(optims_list[-1].worker_id)
 
         path = Path().joinpath(Config.config.tiramisu.workspace, worker)
@@ -349,14 +368,16 @@ class CompilingService:
             tiramisu_program=tiramisu_program,
             optims_list=optims_list,
         )
-
+        
         output_path = f"{str(path)}/{tiramisu_program.name}"
 
-        cpp_file_path = output_path + f"_schedule.cpp" 
+        cpp_file_path = output_path + "_schedule.cpp"
         with open(cpp_file_path, "w") as file:
             file.write(cpp_code)
 
         wrapper_cpp, wrapper_h = tiramisu_program.build_wrappers()
+
+
 
         wrapper_cpp_path = output_path + f"_wrapper.cpp"
         wrapper_h_path = output_path + f"_wrapper.h"
@@ -369,13 +390,11 @@ class CompilingService:
 
         object_name = f"{tiramisu_program.name}.o"
         out_name = f"{tiramisu_program.name}.out"
-
         wrapper_exec = f"{tiramisu_program.name}_wrapper"
 
         shell_script = [
             f"CONDA_ENV={Config.config.env_vars.CONDA_ENV}",
-
-            f"LD_LIBRARY_PATH={Config.config.env_vars.LD_LIBRARY_PATH}",            
+            f"LD_LIBRARY_PATH={Config.config.env_vars.LD_LIBRARY_PATH}",
             "export LD_LIBRARY_PATH",
             f"cd {str(path)}",
             # Compile intermidiate tiramisu file
@@ -398,9 +417,7 @@ class CompilingService:
         )
         run_script = [
             f"CONDA_ENV={Config.config.env_vars.CONDA_ENV}",
-
             f"LD_LIBRARY_PATH={Config.config.env_vars.LD_LIBRARY_PATH}",
-
             "export LD_LIBRARY_PATH",
             # cd to the workspace
             f"cd {str(path)}",
@@ -418,7 +435,7 @@ class CompilingService:
                 text=True,
                 shell=True,
                 check=True,
-                timeout=timeout
+                timeout=timeout,
             )
             numbers = compiler.stdout.split("\n")[-2].split(" ")[:-1]
             for i in range(len(numbers)):
@@ -431,7 +448,7 @@ class CompilingService:
             logging.error(f"Error output: {e.stderr}")
             logging.error(f"Output: {e.stdout}")
 
-        except subprocess.TimeoutExpired as e :
+        except subprocess.TimeoutExpired as e:
             logging.error("Timeout Error")
             raise subprocess.TimeoutExpired(compiler.args, timeout)
 
@@ -440,14 +457,13 @@ class CompilingService:
 
         # Deleting all files of the program
         subprocess.run(
-                [f"rm {output_path}*"],
-                capture_output=True,
-                text=True,
-                shell=True,
-                check=True,
-            )
+            [f"rm {output_path}*"],
+            capture_output=True,
+            text=True,
+            shell=True,
+            check=True,
+        )
         return execution_time
-
 
     @classmethod
     def compile_annotations(cls, tiramisu_program):

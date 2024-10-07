@@ -1,0 +1,38 @@
+#!/bin/bash
+#SBATCH your config
+
+
+WORKER_NUM=$((SLURM_JOB_NUM_NODES - 1))
+PORT=6379
+CONDA_DIR= Insert the path of conda
+CONDA_ENV= Insert the path of the conda env
+
+
+
+. $CONDA_DIR/bin/activate
+conda activate $CONDA_ENV
+
+nodes=$(scontrol show hostnames "$SLURM_JOB_NODELIST")
+nodes_array=($nodes)
+head_node=${nodes_array[0]}
+
+ip_prefix=$(srun --nodes=1 --ntasks=1 -w $head_node hostname --ip-address)
+ip_head=$ip_prefix:$PORT
+echo "head node is at $ip_head"
+
+srun --nodes=1 --ntasks=1 -w $head_node ray start --num-cpus "${SLURM_CPUS_PER_TASK}" --head \
+--node-ip-address="$ip_prefix" --port=$PORT --block & 
+
+sleep 5
+
+echo "starting workers"
+for ((  i=1; i<=$WORKER_NUM; i++ ))
+do
+    node2=${nodes_array[$i]}
+    echo "i=${i}, w = ${w}, node2=$node2"
+    srun --nodes=1 --ntasks=1 -w $node2 ray start --num-cpus "${SLURM_CPUS_PER_TASK}" --address "$ip_head" --block &
+done
+
+sleep 10
+
+python -u evaluate_ppo_gnn.py --num-nodes=$SLURM_JOB_NUM_NODES

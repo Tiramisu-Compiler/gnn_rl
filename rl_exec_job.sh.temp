@@ -1,0 +1,54 @@
+#!/bin/bash
+#SBATCH your config
+
+
+
+if [ -z "$1" ]; then 
+    echo The job has stopped because you did not pass the name argument "name_of_experiment", please execute the slurm job using 'sbatch your_job.sh name_of_experiment'
+    exit 0
+fi
+
+# ip_head=10.10.2.54:6379
+WORKER_NUM=$((SLURM_JOB_NUM_NODES - 1))
+CONDA_DIR= Insert the path of conda
+CONDA_ENV= Insert the path of the conda env
+
+
+. $CONDA_DIR/bin/activate
+conda activate $CONDA_ENV
+
+EXCLUDE_NODES=#Exlude a list of nodes example : ("dn209" "dn210" "dn211" "dn212" "dn186")
+
+nodes=$(scontrol show hostnames "$SLURM_JOB_NODELIST")
+nodes_array=($nodes)
+
+# Filter out the excluded nodes
+filtered_nodes_array=()
+for node in "${nodes_array[@]}"; do
+    if [[ ! " ${EXCLUDE_NODES[@]} " =~ " ${node} " ]]; then
+        filtered_nodes_array+=("$node")
+    fi
+done
+
+head_node=${filtered_nodes_array[0]}
+
+ip_prefix=$(srun --nodes=1 --ntasks=1 -w $head_node hostname --ip-address)
+ip_head=$ip_prefix:$PORT
+echo "head node is at $ip_head"
+
+srun --nodes=1 --ntasks=1 -w $head_node ray start --num-cpus "${SLURM_CPUS_PER_TASK}" --head \
+--node-ip-address="$ip_prefix" --port=$PORT --block & 
+
+sleep 5
+
+echo "starting workers"
+for (( i=1; i<${#filtered_nodes_array[@]}; i++ ))
+do
+    node2=${filtered_nodes_array[$i]}
+    echo "i=${i}, node2=$node2"
+    srun --nodes=1 --ntasks=1 -w $node2 ray start --num-cpus "${SLURM_CPUS_PER_TASK}" --address "$ip_head" --block &
+done
+
+sleep 10
+
+python -u train_ppo_gnn.py --num-nodes=$((SLURM_JOB_NUM_NODES - num of exluded nodes))  --name=$1  #--name is the name of experiment that appeats on MLflow dashboard

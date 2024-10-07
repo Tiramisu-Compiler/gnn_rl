@@ -26,9 +26,9 @@ class TiramisuEnvAPI:
         # This step of initializing the database service must be executed first in the init of tiramisu api
         self.dataset_service = DataSetService(
             cpps_dataset_path=Config.config.dataset.cpps_path,
-            schedules_dataset_path=Config.config.dataset.dataset_path
-            if local_dataset
-            else None,
+            schedules_dataset_path=(
+                Config.config.dataset.dataset_path if local_dataset else None
+            ),
         )
         # The following attribute is independent of RL env , it is used for debugging don't remove it
         self.programs = None
@@ -43,12 +43,11 @@ class TiramisuEnvAPI:
             self.programs = list(self.dataset_service.schedules_dataset.keys())
         return sorted(self.programs)
 
-    def set_program(self, name: str, data: dict = None, cpp_code: str = None):
-        # print("Function : ", name)
+    def set_program(self, name: str, data: dict = None, cpp_code: str = None, worker_id="init"):
         if data:
             # If data is provided externally (From ray dataset actor) then we don't need to use internal
             # dataset service nor compile to get annotations of a program
-            tiramisu_prog = self.tiramisu_service.fetch_prog_offline(
+            tiramisu_prog = self.tiramisu_service.set_from_data(
                 name=name, data=data, original_str=cpp_code
             )
         else:
@@ -58,13 +57,13 @@ class TiramisuEnvAPI:
             # if annotations_exitst is True , then we can fetch the data from the offline dataset if the program name is saved there
             if annotations_exitst:
                 data = self.dataset_service.get_offline_prog_data(name=name)
-                tiramisu_prog = self.tiramisu_service.fetch_prog_offline(
+                tiramisu_prog = self.tiramisu_service.set_from_data(
                     name=name, data=data, original_str=code
                 )
             else:
                 # Load the Tiramisu model from the code string
                 try:
-                    tiramisu_prog = self.tiramisu_service.fetch_prog_compil(code=code)
+                    tiramisu_prog = self.tiramisu_service.set_from_compil(code=code)
                 except Exception as e:
                     if isinstance(e, LoopsDepthException):
                         print("Program has an unsupported loop level")
@@ -79,13 +78,11 @@ class TiramisuEnvAPI:
         schedule = Schedule(tiramisu_prog)
 
         # Use the Scheduler service to set the schedule for the Tiramisu model
-        actions_mask = self.scheduler_service.set_schedule(
-            schedule_object=schedule
+        actions_mask = self.scheduler_service.set_schedule(schedule_object=schedule)
+        
+        initial_exec = self.scheduler_service.prediction_service.get_initial_time(
+            schedule, worker_id
         )
-        if Config.config.dataset.is_benchmark:
-            initial_exec = 1
-        else : 
-            initial_exec = self.scheduler_service.prediction_service.get_initial_time(schedule)
         if not initial_exec:
             return None
 
@@ -187,7 +184,7 @@ class TiramisuEnvAPI:
             "program_annotation": self.scheduler_service.schedule_object.prog.annotations,
             "schedules_legality": self.scheduler_service.schedule_object.prog.schedules_legality,
             "schedules_solver": self.scheduler_service.schedule_object.prog.schedules_solver,
-            "execution_times": self.scheduler_service.schedule_object.prog.execution_times
+            "execution_times": self.scheduler_service.schedule_object.prog.execution_times,
         }
 
     def final_speedup(self):

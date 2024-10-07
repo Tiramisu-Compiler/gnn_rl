@@ -16,13 +16,22 @@ class CompilingService:
         cls,
         schedule_object: Schedule,
         optims_list: List[Action],
+        worker_id: Union[str, None],
     ):
+        if worker_id != None:
+            worker = worker_id
+        else:
+            worker = str(optims_list[-1].worker_id)
+
         tiramisu_program = schedule_object.prog
         workspace = Path(Config.config.tiramisu.workspace)
         output_path = (
             workspace / f"{tiramisu_program.name}legal{optims_list[-1].worker_id}"
         )
 
+        cpp_code = cls.get_legality_code(
+            schedule_object=schedule_object, optims_list=optims_list
+        )
         cpp_code = cls.get_legality_code(
             schedule_object=schedule_object, optims_list=optims_list
         )
@@ -53,9 +62,13 @@ class CompilingService:
 
         for optim in optims_list:
             if isinstance(optim, Unrolling):
+        for optim in optims_list:
+            if isinstance(optim, Unrolling):
                 unrolling_legality += optim.legality_code_str
             else:
+            else:
                 legality_check_lines += optim.legality_code_str
+
 
             if isinstance(optim, Tiling):
                 tiling_in_actions = True
@@ -67,6 +80,7 @@ class CompilingService:
                             loop_levels_size + loop_index, f"t{loop_index}"
                         )
 
+        if tiling_in_actions:
         if tiling_in_actions:
             updated_fusion, cpp_code = cls.fuse_tiling_loops(
                 code=cpp_code, comps_dict=comps_dict
@@ -126,7 +140,14 @@ class CompilingService:
             return "0"
 
     @classmethod
-    def call_skewing_solver(cls, schedule_object, optim_list, action: Action):
+    def call_skewing_solver(
+        cls, schedule_object, optim_list, action: Action, worker_id: Union[str, None]
+    ):
+        if worker_id != None:
+            worker = worker_id
+        else:
+            worker = str(action.worker_id)
+
         params = action.params
         legality_cpp_code = cls.get_legality_code(schedule_object, optim_list)
         to_replace = re.findall(r"std::cout << is_legal;", legality_cpp_code)[0]
@@ -182,7 +203,7 @@ class CompilingService:
         solver_code = legality_cpp_code.replace(to_replace, solver_lines)
         output_path = (
             Path(Config.config.tiramisu.workspace)
-            / f"{schedule_object.prog.name}skew_solver{action.worker_id}"
+            / worker / f"{schedule_object.prog.name}skew_solver{action.worker_id}"
         )
         result_str = cls.run_cpp_code(cpp_code=solver_code, output_path=output_path)
         if not result_str:
@@ -332,10 +353,11 @@ class CompilingService:
         cls,
         tiramisu_program: TiramisuProgram,
         optims_list: List[Action],
-        timeout: int = None,
+        worker_id: str | None = None,
+        timeout: int | None = None
     ):
-        if not optims_list:
-            worker = "init"
+        if worker_id != None:
+            worker = worker_id
         else:
             worker = str(optims_list[-1].worker_id)
 
@@ -350,7 +372,7 @@ class CompilingService:
             tiramisu_program=tiramisu_program,
             optims_list=optims_list,
         )
-
+        
         output_path = f"{str(path)}/{tiramisu_program.name}"
 
         cpp_file_path = output_path + "_schedule.cpp"

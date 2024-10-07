@@ -40,10 +40,20 @@ class GAT(nn.Module):
             in_channels=hidden_size * num_heads,
             out_channels=hidden_size,
         )
+        self.conv_layer3 = GATv2Conv(
+            in_channels=hidden_size,
+            out_channels=hidden_size,
+            heads=num_heads,
+        )
+        self.linear3 = Linear(
+            in_channels=hidden_size * num_heads,
+            out_channels=hidden_size,
+        )
 
         convolutions_layers = [
             self.conv_layer1,
             self.conv_layer2,
+            self.conv_layer3,
         ]
         for convlayer in convolutions_layers:
             for name, param in convlayer.named_parameters():
@@ -52,6 +62,7 @@ class GAT(nn.Module):
         linear_layers = [
             self.linear1,
             self.linear2,
+            self.linear3,
         ]
         for linearlayer in linear_layers:
             nn.init.xavier_uniform_(linearlayer.weight)
@@ -101,11 +112,17 @@ class GAT(nn.Module):
         x2 = torch.concat(
             (global_mean_pool(x, batch_index), global_max_pool(x, batch_index)), dim=-1
         )
+        
+        x = self.conv_layer3(x, edges_index)
+        x = nn.functional.selu(self.linear3(x))
+        x3 = torch.concat(
+            (global_mean_pool(x, batch_index), global_max_pool(x, batch_index)), dim=-1
+        )  
 
         x = torch.concat(
             (
-                x1,
-                x2,
+                x1+x2,
+                x3,
             ),
             dim=-1,
         )

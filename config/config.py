@@ -36,7 +36,6 @@ class DatasetConfig:
     shuffle: bool = False
     seed: int = None
     saving_frequency: int = 10000
-    is_benchmark: bool = False
 
     def __init__(self, dataset_config_dict: Dict):
         self.dataset_format = DatasetFormat.from_string(
@@ -48,28 +47,19 @@ class DatasetConfig:
         self.shuffle = dataset_config_dict["shuffle"]
         self.seed = dataset_config_dict["seed"]
         self.saving_frequency = dataset_config_dict["saving_frequency"]
-        self.is_benchmark = dataset_config_dict["is_benchmark"]
-
-        if dataset_config_dict["is_benchmark"]:
-            self.dataset_path = (
-                dataset_config_dict["benchmark_dataset_path"]
-                if dataset_config_dict["benchmark_dataset_path"]
-                else self.dataset_path
-            )
-            self.cpps_path = (
-                dataset_config_dict["benchmark_cpp_files"]
-                if dataset_config_dict["benchmark_cpp_files"]
-                else self.cpps_path
-            )
-
-
-eckpoint: str = ""
 
 
 @dataclass
 class Experiment:
     legality_speedup: float = 1.0
     beam_search_order: bool = False
+    max_time_in_minutes: int = 5
+    max_slowdown: int = 80
+
+
+@dataclass
+class Test:
+    skip_execute_schedules: bool = False
 
 
 @dataclass
@@ -84,6 +74,7 @@ class AutoSchedulerConfig:
     dataset: DatasetConfig
     experiment: Experiment
     code_deps: CodeDeps
+    test: Test
 
     def __post_init__(self):
         if isinstance(self.tiramisu, dict):
@@ -94,6 +85,8 @@ class AutoSchedulerConfig:
             self.experiment = Experiment(**self.experiment)
         if isinstance(self.code_deps, dict):
             self.code_deps = CodeDeps(**self.code_deps)
+        if isinstance(self.test, dict):
+            self.test = Test(**self.test)
 
 
 def read_yaml_file(path):
@@ -110,7 +103,8 @@ def dict_to_config(parsed_yaml: Dict[Any, Any]) -> AutoSchedulerConfig:
     dataset = DatasetConfig(parsed_yaml["dataset"])
     experiment = Experiment(**parsed_yaml["experiment"])
     code_deps = CodeDeps(**parsed_yaml["code_deps"])
-    return AutoSchedulerConfig(tiramisu, dataset, experiment, code_deps)
+    test = Test(**parsed_yaml["test"])
+    return AutoSchedulerConfig(tiramisu, dataset, experiment, code_deps, test)
 
 
 class Config(object):

@@ -1,0 +1,27 @@
+tiramisu:
+    workspace: a folder to save binary files of tiramisu
+    experiment_dir: a folder to save results of trainings
+
+code_deps:
+    includes:
+        - path where the c++ includes are stored
+    libs:
+        - paths where compiled libraries are stored
+
+dataset:
+    dataset_format: PICKLE
+    cpps_path: dataset/cpps.pkl
+    dataset_path: dataset/schedules.pkl
+    save_path: dataset/
+    shuffle: True
+    seed: 133
+    saving_frequency: 10000
+
+experiment:
+    legality_speedup: 1.0
+    beam_search_order: True
+    max_time_in_minutes: 2
+    max_slowdown: 100
+
+test : 
+    skip_execute_schedules : False

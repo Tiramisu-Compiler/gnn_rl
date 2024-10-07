@@ -8,12 +8,12 @@ class TiramisuService:
     def __init__(self):
         pass
 
-    def fetch_prog_compil(self, code: str):
+    def set_from_compil(self, code: str):
         tiramisu_prog = TiramisuProgram(code=code)
         tiramisu_prog.annotations = self.get_annotations(tiramisu_prog)
         return tiramisu_prog
 
-    def fetch_prog_offline(self,name:str,data:dict,original_str:str=None):
+    def set_from_data(self,name:str,data:dict,original_str:str=None):
         # This function fetched all the data from an offline dataset
         tiramisu_prog = TiramisuProgram.from_dict(name=name,data=data,original_str=original_str)
         return tiramisu_prog

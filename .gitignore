@@ -11,3 +11,5 @@ dataset
 *.sh
 *.pkl
 !requirements.txt
+*.yaml
+

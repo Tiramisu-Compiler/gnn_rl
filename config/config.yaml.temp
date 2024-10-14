@@ -1,11 +1,12 @@
 tiramisu:
-    tiramisu_path: path to tiramisu root dir
     workspace: a folder to save binary files of tiramisu
     experiment_dir: a folder to save results of trainings
 
-env_vars:
-    CONDA_ENV: path to conda env
-    LD_LIBRARY_PATH: "${CONDA_ENV}/lib:${TIRAMISU_ROOT}/3rdParty/Halide/install/lib64:${TIRAMISU_ROOT}/3rdParty/llvm/build/lib:${TIRAMISU_ROOT}/3rdParty/isl/build/lib:"
+code_deps:
+    includes:
+        - path where the c++ includes are stored
+    libs:
+        - paths where compiled libraries are stored
 
 dataset:
     dataset_format: PICKLE

@@ -10,5 +10,6 @@ dataset
 *.json
 *.sh
 *.pkl
+!requirements.txt
 *.yaml
 

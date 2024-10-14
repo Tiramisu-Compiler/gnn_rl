@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal
+from typing import Any, Dict
 import yaml
-import os
 
 # Enum for the dataset format
 
@@ -24,10 +23,8 @@ class DatasetFormat:
 
 @dataclass
 class TiramisuConfig:
-    tiramisu_path: str = ""
-    workspace: str = "./workspace/"
-    experiment_dir: str = ""
-
+    workspace: str = "./experiment_dir/workspace/"
+    experiment_dir: str = "./experiment_dir/"
 
 
 @dataclass
@@ -42,7 +39,8 @@ class DatasetConfig:
 
     def __init__(self, dataset_config_dict: Dict):
         self.dataset_format = DatasetFormat.from_string(
-            dataset_config_dict["dataset_format"])
+            dataset_config_dict["dataset_format"]
+        )
         self.cpps_path = dataset_config_dict["cpps_path"]
         self.dataset_path = dataset_config_dict["dataset_path"]
         self.save_path = dataset_config_dict["save_path"]
@@ -50,15 +48,14 @@ class DatasetConfig:
         self.seed = dataset_config_dict["seed"]
         self.saving_frequency = dataset_config_dict["saving_frequency"]
 
-eckpoint: str = ""
-
 
 @dataclass
 class Experiment:
     legality_speedup: float = 1.0
     beam_search_order: bool = False
-    max_time_in_minutes: int = 5 
+    max_time_in_minutes: int = 5
     max_slowdown: int = 80
+
 
 @dataclass
 class Test:
@@ -66,22 +63,18 @@ class Test:
 
 
 @dataclass
-class EnvVars:
-    TIRAMISU_ROOT: str = ""
-    CONDA_ENV: str = ""
-    LD_LIBRARY_PATH: str = "${CONDA_ENV}/lib:${TIRAMISU_ROOT}/3rdParty/Halide/build/src:${TIRAMISU_ROOT}/3rdParty/llvm/build/lib:${TIRAMISU_ROOT}/3rdParty/isl/build/lib:"
-
+class CodeDeps:
+    includes: list[str] = field(default_factory=list)
+    libs: list[str] = field(default_factory=list)
 
 
 @dataclass
 class AutoSchedulerConfig:
-
     tiramisu: TiramisuConfig
     dataset: DatasetConfig
     experiment: Experiment
-    env_vars: EnvVars
+    code_deps: CodeDeps
     test: Test
-
 
     def __post_init__(self):
         if isinstance(self.tiramisu, dict):
@@ -90,11 +83,10 @@ class AutoSchedulerConfig:
             self.dataset = DatasetConfig(self.dataset)
         if isinstance(self.experiment, dict):
             self.experiment = Experiment(**self.experiment)
-        if isinstance(self.env_vars, dict):
-            self.env_vars = EnvVars(**self.env_vars)
+        if isinstance(self.code_deps, dict):
+            self.code_deps = CodeDeps(**self.code_deps)
         if isinstance(self.test, dict):
             self.test = Test(**self.test)
-    
 
 
 def read_yaml_file(path):
@@ -110,9 +102,9 @@ def dict_to_config(parsed_yaml: Dict[Any, Any]) -> AutoSchedulerConfig:
     tiramisu = TiramisuConfig(**parsed_yaml["tiramisu"])
     dataset = DatasetConfig(parsed_yaml["dataset"])
     experiment = Experiment(**parsed_yaml["experiment"])
-    env_vars = EnvVars(**parsed_yaml["env_vars"])
+    code_deps = CodeDeps(**parsed_yaml["code_deps"])
     test = Test(**parsed_yaml["test"])
-    return AutoSchedulerConfig(tiramisu, dataset,  experiment, env_vars,test)
+    return AutoSchedulerConfig(tiramisu, dataset, experiment, code_deps, test)
 
 
 class Config(object):

@@ -1,12 +1,20 @@
 from abc import abstractmethod
+from pathlib import Path
 import pickle
 from typing import Tuple
 
 from env_api.core.services.tiramisu_service import TiramisuService
 
 
-class BaseDataService():
-    def __init__(self, dataset_path: str, path_to_save_dataset: str, shuffle: bool = False, seed: int = None, saving_frequency: int = 10000) -> None:
+class BaseDataService:
+    def __init__(
+        self,
+        dataset_path: str,
+        path_to_save_dataset: str,
+        shuffle: bool = False,
+        seed: int = None,
+        saving_frequency: int = 10000,
+    ) -> None:
         self.dataset_path = dataset_path
         self.path_to_save_dataset = path_to_save_dataset
         self.shuffle = shuffle
@@ -54,10 +62,12 @@ class BaseDataService():
         """
         print("[Start] Save the legality_annotations_dict to disk")
 
-        updated_dataset_name = (
-            f"{self.path_to_save_dataset}/{self.dataset_name}_updated_{version}"
+        updated_dataset_path = (
+            Path(self.path_to_save_dataset)
+            / f"{self.dataset_name}_updated_{version}.pkl"
         )
-        with open(f"{updated_dataset_name}.pkl", "wb") as f:
+
+        with updated_dataset_path.open("wb") as f:
             pickle.dump(self.dataset, f, protocol=pickle.HIGHEST_PROTOCOL)
 
         print("[Done] Save the legality_annotations_dict to disk")

@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "gnn-rl"
+version = "0.1.0"
+description = ""
+authors = ["Smail KOURTA <sk10691@nyu.edu>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "~3.10"
+mlflow = "2.8.1"
+torch = "1.12.0"
+torch-geometric = "2.4.0"
+ray = {version = "2.3.0", extras = ["rllib"]}
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

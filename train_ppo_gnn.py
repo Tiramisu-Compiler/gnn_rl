@@ -1,3 +1,4 @@
+from pathlib import Path
 import mlflow
 import torch
 import torch.nn as nn
@@ -11,20 +12,7 @@ import math
 from torch_geometric.data import Batch, Data
 import argparse as arg
 
-import os 
-
-def create_dir(run_name):
-    parent_dir = "/scratch/dl5133/Dev/RL-Agent/new_agent/experiment_dir/models"
-
-    path = os.path.join(parent_dir, run_name) 
-
-    try: 
-        os.makedirs(path, exist_ok = True) 
-    except OSError as error: 
-        pass
-
-    return path
-
+import os
 
 num_updates = 2000
 clip_epsilon = 0.3
@@ -42,22 +30,21 @@ weight_decay = 0.0001
 total_steps = num_updates * batch_size
 
 
-
 if "__main__" == __name__:
-    parser = arg.ArgumentParser() 
+    parser = arg.ArgumentParser()
 
     parser.add_argument("--num-nodes", default=1, type=int)
 
     parser.add_argument("--name", type=str, default="experiment_101")
+    parser.add_argument("--cpus", type=str, default=-1)
 
     args = parser.parse_args()
 
-
     NUM_ROLLOUT_WORKERS = args.num_nodes
 
-    if NUM_ROLLOUT_WORKERS > 1 :
+    if NUM_ROLLOUT_WORKERS > 1:
         ray.init("auto")
-    else : 
+    else:
         ray.init()
     # Init global config to run the Tiramisu env
     Config.init()
@@ -73,27 +60,38 @@ if "__main__" == __name__:
     )
     value_loss = nn.MSELoss()
 
-    ppo_agent.load_state_dict(
-        torch.load(
-            "/scratch/dl5133/Dev/RL-Agent/new_agent/experiment_dir/models/experiment_2k_101/last_model_168.pt",
-            map_location=torch.device(device)
-        ),
-    )
+    # create dirs for saving models, outputs, and datasets
+    Path("./experiment_dir/models").mkdir(parents=True, exist_ok=True)
+    Path("./experiment_dir/outputs").mkdir(parents=True, exist_ok=True)
+    Path("./experiment_dir/datasets").mkdir(parents=True, exist_ok=True)
+    Path(Config.config.tiramisu.workspace).mkdir(parents=True, exist_ok=True)
+
+    # ppo_agent.load_state_dict(
+    #     torch.load(
+    #         "/scratch/dl5133/Dev/RL-Agent/new_agent/models/model_exec_training_with_init_103_62.pt",
+    #         map_location=torch.device(device)
+    #     ),
+    # )
+
+    num_cpus = args.cpus
+    if num_cpus == -1:
+        num_cpus = int(ray.cluster_resources()["CPU"])
 
     rollout_workers = [
         RolloutWorker.options(
-            num_cpus=24, num_gpus=0, scheduling_strategy="SPREAD"
+            num_cpus=num_cpus, num_gpus=0, scheduling_strategy="SPREAD"
         ).remote(dataset_worker, Config.config, worker_id=i)
         for i in range(NUM_ROLLOUT_WORKERS)
     ]
 
     run_name = args.name
 
-    model_save_path = create_dir(run_name)
+    model_save_path = Path(f"./experiment_dir/models/{run_name}")
+    model_save_path.mkdir(parents=True, exist_ok=True)
 
     with mlflow.start_run(
         run_name=run_name,
-        run_id="3f83032459e946d5b5a6397e266e5b29"
+        # run_id="3f83032459e946d5b5a6397e266e5b29"
     ) as run:
         mlflow.log_params(
             {
@@ -113,15 +111,17 @@ if "__main__" == __name__:
                 # "NUM_ROLLOUT_WORKERS": NUM_ROLLOUT_WORKERS,
             }
         )
-        best_performance = - np.inf
-        global_steps = 686651
-        for u in range(168,num_updates+1):
-            optimizer.param_groups[0]["lr"] = optimizer.param_groups[0]["lr"] - (lr/(num_updates+100))
+        best_performance = -np.inf
+        global_steps = 0
+        for u in range(num_updates):
+            optimizer.param_groups[0]["lr"] = optimizer.param_groups[0]["lr"] - (
+                lr / (num_updates + 100)
+            )
 
             # entropy_coeff = entropy_coeff_finish
             entropy_coeff = entropy_coeff_finish - (
                 entropy_coeff_finish - entropy_coeff_start
-            ) * np.exp(-200*(global_steps / total_steps))
+            ) * np.exp(-200 * (global_steps / total_steps))
 
             num_steps = 0
             b_actions = torch.Tensor([]).to(device)
@@ -272,10 +272,12 @@ if "__main__" == __name__:
             speedups_mean = b_speedups.mean().item()
 
             torch.save(ppo_agent.state_dict(), f"{model_save_path}/last_model_{u}.pt")
-            if (u - 168) >= 10 : 
+            if u >= 10:
                 os.remove(f"{model_save_path}/last_model_{u-10}.pt")
             if best_performance < speedups_mean:
-                torch.save(ppo_agent.state_dict(), f"{model_save_path}/best_model_{u}.pt")
+                torch.save(
+                    ppo_agent.state_dict(), f"{model_save_path}/best_model_{u}.pt"
+                )
                 best_performance = speedups_mean
 
             infos = {
@@ -287,7 +289,7 @@ if "__main__" == __name__:
                 "Reward min": b_speedups.min().item(),
                 "Reward max": b_speedups.max().item(),
                 "Episode length mean": avg_episode_length,
-                "Learning rate" : optimizer.param_groups[0]["lr"],
+                "Learning rate": optimizer.param_groups[0]["lr"],
             }
             print(infos)
             mlflow.log_metrics(
@@ -297,5 +299,3 @@ if "__main__" == __name__:
         mlflow.end_run()
 
     ray.shutdown()
-
-

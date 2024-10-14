@@ -36,7 +36,7 @@ if "__main__" == __name__:
     parser.add_argument("--num-nodes", default=1, type=int)
 
     parser.add_argument("--name", type=str, default="experiment_101")
-    parser.add_argument("--cpus", type=str, default=2)
+    parser.add_argument("--cpus", type=str, default=-1)
 
     args = parser.parse_args()
 
@@ -73,9 +73,13 @@ if "__main__" == __name__:
     #     ),
     # )
 
+    num_cpus = args.cpus
+    if num_cpus == -1:
+        num_cpus = int(ray.cluster_resources()["CPU"])
+
     rollout_workers = [
         RolloutWorker.options(
-            num_cpus=args.cpus, num_gpus=0, scheduling_strategy="SPREAD"
+            num_cpus=num_cpus, num_gpus=0, scheduling_strategy="SPREAD"
         ).remote(dataset_worker, Config.config, worker_id=i)
         for i in range(NUM_ROLLOUT_WORKERS)
     ]

@@ -63,7 +63,8 @@ class BaseDataService:
         print("[Start] Save the legality_annotations_dict to disk")
 
         updated_dataset_path = (
-            Path(self.path_to_save_dataset) / f"{self.dataset_name}_updated_{version}"
+            Path(self.path_to_save_dataset)
+            / f"{self.dataset_name}_updated_{version}.pkl"
         )
 
         with updated_dataset_path.open("wb") as f:

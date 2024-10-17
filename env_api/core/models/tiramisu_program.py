@@ -1,4 +1,6 @@
-import re, random
+import re
+import random
+from config.config import Config
 from env_api.utils.wrapper_code import WrappersCode
 
 
@@ -58,11 +60,14 @@ int main(int argc, char **argv)
         if tiramisu_prog.annotations:
             tiramisu_prog.comps = list(tiramisu_prog.annotations["computations"].keys())
             tiramisu_prog.schedules_legality = data["schedules_legality"]
-            if not "schedules_solver" in data:
+            if "schedules_solver" not in data:
                 data["schedules_solver"] = {}
             tiramisu_prog.schedules_solver = data["schedules_solver"]
             if "execution_times" in data:
                 tiramisu_prog.execution_times = data["execution_times"]
+
+            if Config.config.machine not in tiramisu_prog.execution_times:
+                tiramisu_prog.execution_times[Config.config.machine] = {}
 
         tiramisu_prog.load_code_lines(original_str)
 
@@ -106,7 +111,6 @@ int main(int argc, char **argv)
             )[0]
             self.buffer_sizes.append(re.findall(r"\d+", sizes_vect))
 
-
     def build_wrappers(tiramisu_program):
         buffers_init_lines = ""
         for i, buffer_name in enumerate(tiramisu_program.IO_buffer_names):
@@ -146,3 +150,14 @@ int main(int argc, char **argv)
         )
 
         return wrapper_cpp_code, wrapper_h_code
+
+    def get_execution_time(
+        self, schedule_str: str = "initial_execution", machine: str = "jubail"
+    ):
+        if (
+            machine in self.execution_times
+            and schedule_str in self.execution_times[machine]
+        ):
+            return self.execution_times[machine][schedule_str]
+
+        return None

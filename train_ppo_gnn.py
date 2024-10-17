@@ -49,6 +49,8 @@ if "__main__" == __name__:
     # Init global config to run the Tiramisu env
     Config.init()
 
+    print(f"Number of CPUs detected by ray: {ray.cluster_resources()['CPU']}")
+
     dataset_worker = DatasetActor.remote(Config.config.dataset)
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -75,7 +77,7 @@ if "__main__" == __name__:
 
     num_cpus = args.cpus
     if num_cpus == -1:
-        num_cpus = int(ray.cluster_resources()["CPU"])
+        num_cpus = int(ray.cluster_resources()["CPU"]) // NUM_ROLLOUT_WORKERS
 
     rollout_workers = [
         RolloutWorker.options(

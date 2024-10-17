@@ -75,6 +75,7 @@ class AutoSchedulerConfig:
     experiment: Experiment
     code_deps: CodeDeps
     test: Test
+    machine: str = "jubail"
 
     def __post_init__(self):
         if isinstance(self.tiramisu, dict):
@@ -104,7 +105,8 @@ def dict_to_config(parsed_yaml: Dict[Any, Any]) -> AutoSchedulerConfig:
     experiment = Experiment(**parsed_yaml["experiment"])
     code_deps = CodeDeps(**parsed_yaml["code_deps"])
     test = Test(**parsed_yaml["test"])
-    return AutoSchedulerConfig(tiramisu, dataset, experiment, code_deps, test)
+    machine = parsed_yaml.get("machine", "jubail")
+    return AutoSchedulerConfig(tiramisu, dataset, experiment, code_deps, test, machine)
 
 
 class Config(object):

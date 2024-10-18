@@ -59,8 +59,8 @@ class HybridDataService(BaseDataService):
         # print(
         #     f"Selected function with index: {self.current_function_index}, name: {function_name}"
         # )
-        if(function_name in self.dataset):
+        if function_name in self.dataset:
             # If the function doesn't exit in the dataset it will be compiled automatically
             return function_name, self.dataset[function_name], None
-        else : 
+        else:
             return function_name, None, None

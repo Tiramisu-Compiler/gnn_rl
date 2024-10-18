@@ -36,6 +36,7 @@ class DatasetConfig:
     shuffle: bool = False
     seed: int = None
     saving_frequency: int = 10000
+    tags: list[str] = field(default_factory=list)
 
     def __init__(self, dataset_config_dict: Dict):
         self.dataset_format = DatasetFormat.from_string(
@@ -47,6 +48,7 @@ class DatasetConfig:
         self.shuffle = dataset_config_dict["shuffle"]
         self.seed = dataset_config_dict["seed"]
         self.saving_frequency = dataset_config_dict["saving_frequency"]
+        self.tags = dataset_config_dict["tags"] if "tags" in dataset_config_dict else []
 
 
 @dataclass

@@ -4,7 +4,6 @@ from env_api.core.services.tiramisu_service import *
 from env_api.scheduler.models.action import *
 from env_api.scheduler.models.schedule import Schedule
 from env_api.scheduler.services.scheduler_service import SchedulerService
-import os
 from config.config import Config
 
 
@@ -39,11 +38,13 @@ class TiramisuEnvAPI:
     # This method is used Outside of the RL env for independent testing , don't remove it in order
     # to make tiramisu_api_tutorial work
     def get_programs(self):
-        if self.programs == None:
+        if self.programs is None:
             self.programs = list(self.dataset_service.schedules_dataset.keys())
         return sorted(self.programs)
 
-    def set_program(self, name: str, data: dict = None, cpp_code: str = None, worker_id="init"):
+    def set_program(
+        self, name: str, data: dict = None, cpp_code: str = None, worker_id="init"
+    ):
         if data:
             # If data is provided externally (From ray dataset actor) then we don't need to use internal
             # dataset service nor compile to get annotations of a program
@@ -79,7 +80,7 @@ class TiramisuEnvAPI:
 
         # Use the Scheduler service to set the schedule for the Tiramisu model
         actions_mask = self.scheduler_service.set_schedule(schedule_object=schedule)
-        
+
         initial_exec = self.scheduler_service.prediction_service.get_initial_time(
             schedule, worker_id
         )
@@ -179,7 +180,7 @@ class TiramisuEnvAPI:
     def save_legality_dataset(self, suffix: str = ""):
         self.dataset_service.store_offline_dataset(suffix=suffix)
 
-    def get_current_tiramisu_program_dict(self) -> TiramisuProgram:
+    def get_current_tiramisu_program_dict(self) -> dict[str, any]:
         return {
             "program_annotation": self.scheduler_service.schedule_object.prog.annotations,
             "schedules_legality": self.scheduler_service.schedule_object.prog.schedules_legality,

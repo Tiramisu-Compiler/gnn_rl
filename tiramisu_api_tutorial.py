@@ -30,7 +30,6 @@ if __name__ == "__main__":
         # t_api.apply_tiling(loops=[0,1], sizes=[2,2])
         # ast.get_fusion_levels()
 
-
         actions_mask = t_api.set_program(name=program)
         # There is some programs that are not supported so we need to check our representation first
         if True:
@@ -82,7 +81,10 @@ if __name__ == "__main__":
             #     legality,
             #     actions_mask,
             # ) = t_api.parallelize(loop_level=0, env_id=1)
-            (speedup, legality, actions_mask,
+            (
+                speedup,
+                legality,
+                actions_mask,
             ) = t_api.unroll(unrolling_factor=10, env_id=7, worker_id="1")
 
             # t_api.scheduler_service.next_branch()

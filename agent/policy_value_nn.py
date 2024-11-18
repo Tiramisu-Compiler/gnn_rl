@@ -11,7 +11,6 @@ from torch.distributions import Categorical
 import numpy as np
 
 
-
 class GAT(nn.Module):
     def __init__(
         self,
@@ -112,16 +111,16 @@ class GAT(nn.Module):
         x2 = torch.concat(
             (global_mean_pool(x, batch_index), global_max_pool(x, batch_index)), dim=-1
         )
-        
+
         x = self.conv_layer3(x, edges_index)
         x = nn.functional.selu(self.linear3(x))
         x3 = torch.concat(
             (global_mean_pool(x, batch_index), global_max_pool(x, batch_index)), dim=-1
-        )  
+        )
 
         x = torch.concat(
             (
-                x1+x2,
+                x1 + x2,
                 x3,
             ),
             dim=-1,
@@ -135,7 +134,7 @@ class GAT(nn.Module):
     def forward(self, data, actions_mask=None, action=None):
         weights = self.shared_layers(data)
         logits = self.π(weights)
-        if actions_mask != None : 
+        if actions_mask != None:
             logits = logits - actions_mask * 1e8
         probs = Categorical(logits=logits)
         if action == None:

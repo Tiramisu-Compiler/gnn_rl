@@ -105,7 +105,10 @@ def apply_flattened_action(
             branch = tiramisu_api.scheduler_service.current_branch
             its = tiramisu_api.scheduler_service.branches[branch].common_it
             apply_tiling(
-                [its[loop_level], its[loop_level + 1]], [size, size], node_feats, it_index
+                [its[loop_level], its[loop_level + 1]],
+                [size, size],
+                node_feats,
+                it_index,
             )
     elif action < 22:
         loop_level = action - 18
@@ -122,7 +125,10 @@ def apply_flattened_action(
             branch = tiramisu_api.scheduler_service.current_branch
             its = tiramisu_api.scheduler_service.branches[branch].common_it
             apply_tiling(
-                [its[loop_level], its[loop_level + 1]], [size, size], node_feats, it_index
+                [its[loop_level], its[loop_level + 1]],
+                [size, size],
+                node_feats,
+                it_index,
             )
     elif action < 26:
         loop_level = action - 22
@@ -139,7 +145,10 @@ def apply_flattened_action(
             branch = tiramisu_api.scheduler_service.current_branch
             its = tiramisu_api.scheduler_service.branches[branch].common_it
             apply_tiling(
-                [its[loop_level], its[loop_level + 1]], [size, size], node_feats, it_index
+                [its[loop_level], its[loop_level + 1]],
+                [size, size],
+                node_feats,
+                it_index,
             )
     elif action < 30:
         loop_level = action - 26
@@ -158,7 +167,10 @@ def apply_flattened_action(
             branch = tiramisu_api.scheduler_service.current_branch
             its = tiramisu_api.scheduler_service.branches[branch].common_it
             apply_tiling(
-                [its[loop_level], its[loop_level + 1]], [size_x, size_y], node_feats, it_index
+                [its[loop_level], its[loop_level + 1]],
+                [size_x, size_y],
+                node_feats,
+                it_index,
             )
     elif action < 34:
         loop_level = action - 30
@@ -177,7 +189,10 @@ def apply_flattened_action(
             branch = tiramisu_api.scheduler_service.current_branch
             its = tiramisu_api.scheduler_service.branches[branch].common_it
             apply_tiling(
-                [its[loop_level], its[loop_level + 1]], [size_x, size_y], node_feats, it_index
+                [its[loop_level], its[loop_level + 1]],
+                [size_x, size_y],
+                node_feats,
+                it_index,
             )
     elif action < 38:
         loop_level = action - 34
@@ -196,7 +211,10 @@ def apply_flattened_action(
             branch = tiramisu_api.scheduler_service.current_branch
             its = tiramisu_api.scheduler_service.branches[branch].common_it
             apply_tiling(
-                [its[loop_level], its[loop_level + 1]], [size_x, size_y], node_feats, it_index
+                [its[loop_level], its[loop_level + 1]],
+                [size_x, size_y],
+                node_feats,
+                it_index,
             )
     elif action < 42:
         loop_level = action - 38
@@ -215,7 +233,10 @@ def apply_flattened_action(
             branch = tiramisu_api.scheduler_service.current_branch
             its = tiramisu_api.scheduler_service.branches[branch].common_it
             apply_tiling(
-                [its[loop_level], its[loop_level + 1]], [size_x, size_y], node_feats, it_index
+                [its[loop_level], its[loop_level + 1]],
+                [size_x, size_y],
+                node_feats,
+                it_index,
             )
     elif action < 46:
         loop_level = action - 42
@@ -234,7 +255,10 @@ def apply_flattened_action(
             branch = tiramisu_api.scheduler_service.current_branch
             its = tiramisu_api.scheduler_service.branches[branch].common_it
             apply_tiling(
-                [its[loop_level], its[loop_level + 1]], [size_x, size_y], node_feats, it_index
+                [its[loop_level], its[loop_level + 1]],
+                [size_x, size_y],
+                node_feats,
+                it_index,
             )
     elif action < 50:
         loop_level = action - 46
@@ -253,7 +277,10 @@ def apply_flattened_action(
             branch = tiramisu_api.scheduler_service.current_branch
             its = tiramisu_api.scheduler_service.branches[branch].common_it
             apply_tiling(
-                [its[loop_level], its[loop_level + 1]], [size_x, size_y], node_feats, it_index
+                [its[loop_level], its[loop_level + 1]],
+                [size_x, size_y],
+                node_feats,
+                it_index,
             )
     elif action < 55:
         factor = action - 49
@@ -291,14 +318,14 @@ def apply_flattened_action(
 
 
 Transition = namedtuple(
-    "Transition", ("state", "action", "reward", "value", "log_prob", "entropy", "actions_mask")
+    "Transition",
+    ("state", "action", "reward", "value", "log_prob", "entropy", "actions_mask"),
 )
 
 
 @ray.remote
 class RolloutWorker:
     def __init__(self, dataset_worker, config, worker_id=0):
-
         Config.config = config
         self.tiramisu_api = TiramisuEnvAPI(local_dataset=False)
         self.dataset_worker = dataset_worker
@@ -320,8 +347,9 @@ class RolloutWorker:
         actions_mask = None
         while not isinstance(actions_mask, np.ndarray):
             prog_infos = ray.get(self.dataset_worker.get_next_function.remote())
-            actions_mask = self.tiramisu_api.set_program(*prog_infos, worker_id=str(self.worker_id))
-
+            actions_mask = self.tiramisu_api.set_program(
+                *prog_infos, worker_id=str(self.worker_id)
+            )
 
         self.current_program = prog_infos[0]
 
@@ -408,7 +436,7 @@ class RolloutWorker:
                 + "\n"
             )
 
-            if self.steps == 40 : 
+            if self.steps == 40:
                 done = True
 
         else:
@@ -417,9 +445,11 @@ class RolloutWorker:
             tiramisu_program_dict = (
                 self.tiramisu_api.get_current_tiramisu_program_dict()
             )
-            ray.get(self.dataset_worker.update_dataset.remote(
-                self.current_program, tiramisu_program_dict
-            ))
+            ray.get(
+                self.dataset_worker.update_dataset.remote(
+                    self.current_program, tiramisu_program_dict
+                )
+            )
 
         return {
             "trajectory": trajectory,

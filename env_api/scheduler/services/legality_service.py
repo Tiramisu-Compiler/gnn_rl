@@ -52,7 +52,7 @@ class LegalityService:
                     schedule_object=schedule_object,
                     optim_list=schedule_object.schedule_list,
                     action=action,
-                    worker_id=action.worker_id
+                    worker_id=action.worker_id,
                 )
                 # Save the results of skewing solver in the dataset
                 schedule_object.prog.schedules_solver[schdule_str] = factors

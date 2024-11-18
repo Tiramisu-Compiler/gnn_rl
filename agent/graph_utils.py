@@ -1,5 +1,6 @@
-import numpy as np 
+import numpy as np
 import re
+
 
 def isl_to_write_matrix(isl_map):
     comp_iterators_str = re.findall(r"\[(.*)\]\s*->", isl_map)[0]
@@ -39,9 +40,9 @@ def iterators_to_vectors(annotations):
 
 def pad_access_matrix(access_matrix, max_depth):
     padded_access_matrix = np.ones((max_depth + 1, max_depth + 2)) * -1
-    padded_access_matrix[
-        : access_matrix.shape[0], : access_matrix.shape[1]
-    ] = access_matrix
+    padded_access_matrix[: access_matrix.shape[0], : access_matrix.shape[1]] = (
+        access_matrix
+    )
     return padded_access_matrix
 
 
@@ -71,9 +72,7 @@ def comps_to_vectors(annotations):
         # The write-to buffer id
         single_comp_vector[6] = +comp_dict["write_buffer_id"]
         # We add a vector of write access
-        write_matrix = isl_to_write_matrix(
-            comp_dict["write_access_relation"]
-        )
+        write_matrix = isl_to_write_matrix(comp_dict["write_access_relation"])
         padded_matrix = pad_access_matrix(write_matrix, max_depth).reshape(-1)
         single_comp_vector[7 : 7 + padded_matrix.shape[0]] = padded_matrix
         # We add vector of read access

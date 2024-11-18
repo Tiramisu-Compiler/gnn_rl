@@ -1,7 +1,8 @@
-import numpy as np , copy
+import numpy as np, copy
 from config.config import Config
 from env_api.core.models.tiramisu_program import TiramisuProgram
 from env_api.scheduler.models.action import *
+
 
 class Schedule:
     def __init__(self, program: TiramisuProgram):
@@ -21,55 +22,59 @@ class Schedule:
 
         self.actions_mask = None
 
-
-        if((type(self).__name__) == "Schedule"):
+        if (type(self).__name__) == "Schedule":
             self.__set_action_mask()
             self.__form_branches()
-        else : 
+        else:
             self.__set_action_mask()
 
-    
     def __set_action_mask(self):
         self.actions_mask = np.zeros(56)
-            
+
     def __form_branches(self):
         branches = []
         iterators = copy.deepcopy(self.prog.annotations["iterators"])
         computations = copy.deepcopy(self.prog.annotations["computations"])
         it = {}
         for computation in computations:
-            iterators = copy.deepcopy(self.prog.annotations["computations"][computation]["iterators"])
-            if iterators[-1] in it :
+            iterators = copy.deepcopy(
+                self.prog.annotations["computations"][computation]["iterators"]
+            )
+            if iterators[-1] in it:
                 it[iterators[-1]]["comps"].append(computation)
-            else :
-                it[iterators[-1]] = {
-                    "comps" : [computation],
-                    "iterators" : iterators
+            else:
+                it[iterators[-1]] = {"comps": [computation], "iterators": iterators}
+
+        for iterator in it:
+            branches.append(
+                {
+                    "comps": it[iterator]["comps"],
+                    "iterators": it[iterator]["iterators"],
+                    "annotations": {},
                 }
-        
-        for iterator in it :
-            branches.append({
-                "comps" : it[iterator]["comps"],
-                "iterators" : it[iterator]["iterators"],
-                "annotations": {}
-            })
-                
-        for branch in branches :
-            branch_annotations = {
-                "computations" : {},
-                "iterators": {}
-            }
+            )
+
+        for branch in branches:
+            branch_annotations = {"computations": {}, "iterators": {}}
             for comp in branch["comps"]:
-                branch_annotations["computations"][comp] = copy.deepcopy(self.prog.annotations["computations"][comp])
+                branch_annotations["computations"][comp] = copy.deepcopy(
+                    self.prog.annotations["computations"][comp]
+                )
             # extract the branch specific iterators annotations
             for iterator in branch["iterators"]:
-                branch_annotations["iterators"][iterator] = copy.deepcopy(self.prog.annotations["iterators"][iterator])
-                if (self.prog.annotations["iterators"][iterator]["parent_iterator"]):
+                branch_annotations["iterators"][iterator] = copy.deepcopy(
+                    self.prog.annotations["iterators"][iterator]
+                )
+                if self.prog.annotations["iterators"][iterator]["parent_iterator"]:
                     # Making sure that the parent node has the actual node as the only child
                     # It may happen that the parent node has many children but in a branch it is only allowed
                     # to have a single child to form a straight-forward branch from top to bottom
-                    parent = (branch_annotations["iterators"][iterator]["parent_iterator"])
-                    branch_annotations["iterators"][parent]["child_iterators"] = copy.deepcopy([iterator])
+                    parent = branch_annotations["iterators"][iterator][
+                        "parent_iterator"
+                    ]
+                    branch_annotations["iterators"][parent]["child_iterators"] = (
+                        copy.deepcopy([iterator])
+                    )
                     branch_annotations["iterators"][parent]["computations_list"] = []
             branch["annotations"] = copy.deepcopy(branch_annotations)
 
@@ -78,46 +83,42 @@ class Schedule:
         # print(3 * "\n" + "Branches")
         # pprint(self.branches)
 
-
-
     def build_sched_string(self) -> str:
         # Prepare a dictionary of computations name to fill it with each action applied on every comp
         comps = {}
         # Map the schedules applied one by one
-        for schedule in self.schedule_list : 
+        for schedule in self.schedule_list:
             # schedule has comps_schedule which includes the comps that was invloved in the optimisation
             for key in schedule.comps_schedule.keys():
                 # Add the data from that schedule to the global comps dictionnary
-                if(not key in comps or not comps[key]):
+                if not key in comps or not comps[key]:
                     comps[key] = ""
                 comps[key] += schedule.comps_schedule[key]
         # Prepare the string and form it from the comps dictionary
         schedule_string = ""
         for key in comps.keys():
-            schedule_string+= "{"+key+"}:"+comps[key]
+            schedule_string += "{" + key + "}:" + comps[key]
         return schedule_string
 
-    
-    def update_actions_mask(self, action : Action,applied : bool = True):
+    def update_actions_mask(self, action: Action, applied: bool = True):
         # Whether an action is legal or not we should mask it to not use it again
         self.actions_mask[action.env_id] = 1
 
         if applied and Config.config.experiment.beam_search_order:
             self.apply_beam_search_conditions(action=action)
-    
-    def apply_beam_search_conditions(self, action : Action):
+
+    def apply_beam_search_conditions(self, action: Action):
         # The order of actions in beam search :
         # Fusion, [Interchange, reversal, skewing], parallelization, tiling, unrolling
-        if (isinstance(action,Skewing)):
+        if isinstance(action, Skewing):
             self.actions_mask[0:12] = 1
             self.actions_mask[14:50] = 1
 
-
-        elif (isinstance(action,Parallelization)):
+        elif isinstance(action, Parallelization):
             self.actions_mask[0:12] = 1
 
-        elif (isinstance(action,Tiling)) : 
+        elif isinstance(action, Tiling):
             self.actions_mask[0:50] = 1
 
-        elif (isinstance(action,Unrolling)):
+        elif isinstance(action, Unrolling):
             self.actions_mask[0:55] = 1

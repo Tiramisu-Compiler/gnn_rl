@@ -27,8 +27,7 @@ def write_cpp_file(schedule_object):
 
 
 if "__main__" == __name__:
-
-    parser = arg.ArgumentParser() 
+    parser = arg.ArgumentParser()
 
     parser.add_argument("--num-nodes", default=1, type=int)
 
@@ -38,9 +37,9 @@ if "__main__" == __name__:
 
     full_log = ""
 
-    if NUM_ROLLOUT_WORKERS > 1 :
+    if NUM_ROLLOUT_WORKERS > 1:
         ray.init("auto")
-    else : 
+    else:
         ray.init()
     # Init global config to run the Tiramisu env
     Config.init()

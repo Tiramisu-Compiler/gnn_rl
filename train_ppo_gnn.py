@@ -3,9 +3,9 @@ import mlflow
 import torch
 import torch.nn as nn
 from agent.policy_value_nn import GAT
-from agent.rollout_worker import RolloutWorker, Transition
+from agent.rollout_worker import RolloutWorkerRemote, Transition
 from config.config import Config
-from utils.dataset_actor.dataset_actor import DatasetActor
+from utils.dataset_actor.dataset_actor import DatasetActorRemote
 import numpy as np
 import ray
 import math
@@ -51,7 +51,7 @@ if "__main__" == __name__:
 
     print(f"Number of CPUs detected by ray: {ray.cluster_resources()['CPU']}")
 
-    dataset_worker = DatasetActor.remote(Config.config.dataset)
+    dataset_worker = DatasetActorRemote.remote(Config.config.dataset)
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
     ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=128, num_outputs=56).to(
@@ -80,7 +80,7 @@ if "__main__" == __name__:
         num_cpus = int(ray.cluster_resources()["CPU"]) // NUM_ROLLOUT_WORKERS
 
     rollout_workers = [
-        RolloutWorker.options(
+        RolloutWorkerRemote.options(
             num_cpus=num_cpus, num_gpus=0, scheduling_strategy="SPREAD"
         ).remote(dataset_worker, Config.config, worker_id=i)
         for i in range(NUM_ROLLOUT_WORKERS)

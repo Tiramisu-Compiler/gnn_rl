@@ -78,6 +78,7 @@ class AutoSchedulerConfig:
     code_deps: CodeDeps
     test: Test
     machine: str = "jubail"
+    tiralib_config_path: str = "./config/tiralib_config.yaml"
 
     def __post_init__(self):
         if isinstance(self.tiramisu, dict):

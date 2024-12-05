@@ -1,9 +1,6 @@
 from abc import abstractmethod
 from pathlib import Path
 import pickle
-from typing import Tuple
-
-from env_api.core.services.tiramisu_service import TiramisuService
 
 
 class BaseDataService:
@@ -27,10 +24,9 @@ class BaseDataService:
         self.current_function_index = 0
         self.nbr_updates = 0
         self.dataset_name = dataset_path.split("/")[-1].split(".")[0]
-        self.tiramisu_service = TiramisuService()
 
     @abstractmethod
-    def get_next_function(self, random=False) -> Tuple:
+    def get_next_function(self, random=False) -> tuple[str, dict, str]:
         pass
 
     # Update the dataset with the new function

@@ -2,7 +2,7 @@ import pickle
 import random
 import os
 import numpy as np
-from env_api.core.models.tiramisu_program import TiramisuProgram
+
 from utils.dataset_actor.services.base_data_service import (
     BaseDataService,
 )
@@ -46,7 +46,7 @@ class HybridDataService(BaseDataService):
         self.dataset_size = len(self.function_names)
 
     # Returns next function name, function data, and function cpps
-    def get_next_function(self, random=False) -> TiramisuProgram:
+    def get_next_function(self, random=False):
         if random:
             function_name = np.random.choice(self.function_names)
         # Choose the next function sequentially

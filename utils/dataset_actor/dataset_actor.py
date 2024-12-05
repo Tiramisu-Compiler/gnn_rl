@@ -1,14 +1,12 @@
-import ray
 import config.config as cfg
-import env_api.core.models.tiramisu_program as tiramisu_program
 from utils.dataset_actor.services.hybrid_data_service import HybridDataService
 from utils.dataset_actor.services.pickle_data_service import PickleDataService
+import ray
 
 # Frequency at which the dataset is saved to disk
 SAVING_FREQUENCY = 10000
 
 
-@ray.remote
 class DatasetActor:
     """
     DatasetActor is a class that is used to read the dataset and update it.
@@ -43,7 +41,7 @@ class DatasetActor:
         else:
             raise ValueError("Unknown dataset format")
 
-    def get_next_function(self, random=False) -> tiramisu_program.TiramisuProgram:
+    def get_next_function(self, random=False):
         return self.dataset_service.get_next_function(random)
 
     # Update the dataset with the new function
@@ -51,5 +49,18 @@ class DatasetActor:
         return self.dataset_service.update_dataset(function_name, function_dict)
 
     # Get dataset size
+    @property
     def get_dataset_size(self) -> int:
         return self.dataset_service.dataset_size
+
+    def get_function_by_name(self, function_name: str):
+        return self.dataset_service.get_function_by_name(function_name)
+
+
+@ray.remote
+class DatasetActorRemote(DatasetActor):
+    def __init__(
+        self,
+        config: cfg.DatasetConfig,
+    ):
+        super().__init__(config)

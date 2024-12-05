@@ -2,7 +2,6 @@ import pickle
 import random
 
 import numpy as np
-from env_api.core.models.tiramisu_program import TiramisuProgram
 from utils.dataset_actor.services.base_data_service import (
     BaseDataService,
 )
@@ -35,18 +34,18 @@ class PickleDataService(BaseDataService):
         )
 
         with open(self.dataset_path, "rb") as f:
-            self.dataset = pickle.load(f)
-            self.function_names = list(self.dataset.keys())
+            self.dataset: dict[str, dict] = pickle.load(f)
+            self.function_names: list[str] = list(self.dataset.keys())
             if self.tags:
                 print(f"Filtering dataset by tags: {self.tags}")
-                filtered_function_names = []
+                filtered_function_names: list[str] = []
                 for program in self.function_names:
                     if any(tag in self.dataset[program]["tags"] for tag in self.tags):
                         filtered_function_names.append(program)
                 self.function_names = filtered_function_names
 
         with open(self.cpps_path, "rb") as f:
-            self.cpps = pickle.load(f)
+            self.cpps: dict[str, str] = pickle.load(f)
 
         # Shuffle the dataset (can be used with random sampling turned off to get a random order)
         if self.shuffle:
@@ -58,9 +57,9 @@ class PickleDataService(BaseDataService):
         self.dataset_size = len(self.function_names)
 
     # Returns next function name, function data, and function cpps
-    def get_next_function(self, random=False) -> TiramisuProgram:
+    def get_next_function(self, random=False) -> tuple[str, dict, str]:
         if random:
-            function_name = np.random.choice(self.function_names)
+            function_name: str = np.random.choice(self.function_names)
         # Choose the next function sequentially
         else:
             function_name = self.function_names[
@@ -72,4 +71,7 @@ class PickleDataService(BaseDataService):
         #     f"Selected function with index: {self.current_function_index}, name: {function_name}"
         # )
 
+        return function_name, self.dataset[function_name], self.cpps[function_name]
+
+    def get_function_by_name(self, function_name: str) -> tuple[dict, str]:
         return function_name, self.dataset[function_name], self.cpps[function_name]

@@ -11,12 +11,14 @@ python = "~3.10"
 mlflow = "2.8.1"
 torch = "1.12.0"
 torch-geometric = "2.4.0"
-ray = {version = "2.3.0", extras = ["rllib"]}
+ray = { version = "2.3.0", extras = ["rllib"] }
+tiralib = {git = "https://github.com/Tiramisu-Compiler/TiraLib"}
 
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
 ruff = "^0.7.4"
+ipykernel = "^6.29.5"
 
 [build-system]
 requires = ["poetry-core"]

@@ -1,5 +1,6 @@
 from collections import namedtuple
 import logging
+from pathlib import Path
 
 import ray
 import numpy as np
@@ -26,6 +27,7 @@ class RolloutWorker:
         dataset_worker: DatasetActor,
         config: AutoSchedulerConfig,
         worker_id: int = 0,
+        function_name: str = None,
     ):
         Config.config = config
         self.dataset_worker = dataset_worker
@@ -42,18 +44,21 @@ class RolloutWorker:
         self.steps = None
 
         # Initializing values and the episode
-        self.reset()
+        self.reset(function_name)
 
-    def reset(self):
+    def reset(self, function_name: str = None):
         model_compatible_program = False
         while not model_compatible_program:
             logger.info("Getting next function")
-            function_name, function_data, cpp_code = ray.get(
-                self.dataset_worker.get_next_function.remote()
-            )
-            # function_name, function_data, cpp_code = (
-            #     self.dataset_worker.get_function_by_name("function025885")
-            # )
+            if function_name:
+                function_name, function_data, cpp_code = (
+                    self.dataset_worker.get_function_by_name(function_name)
+                )
+            else:
+                function_name, function_data, cpp_code = ray.get(
+                    self.dataset_worker.get_next_function.remote()
+                )
+
             annotations = function_data["program_annotation"]
             model_compatible_program = program_compatible_with_model(annotations)
 
@@ -121,6 +126,8 @@ class RolloutWorker:
 
             self.state = (new_node_feats, new_edge_index, it_index)
 
+            print(f"Current Action : {action}")
+            print(f"Current Action sequence : {self.tiramisu_interface.action_indices}")
             log_trajectory += (
                 f"\nStep : {self.steps}"
                 + f"\nAction ID : {action}"
@@ -143,6 +150,13 @@ class RolloutWorker:
         #             self.current_program, tiramisu_program_dict
         #         )
         #     )
+
+        # clean up created files
+        # delete files with the filename in workspace
+        for filename in Path(Config.config.tiramisu.workspace).glob("*"):
+            if self.current_program in filename.name:
+                filename.unlink()
+
         print(f"Schedule : {self.tiramisu_interface.schedule}")
         print(f"actions : {self.tiramisu_interface.action_indices}")
         return {

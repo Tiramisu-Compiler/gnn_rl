@@ -8,6 +8,8 @@ from agent.graph_utils import encode_data_type, isl_to_write_matrix, pad_access_
 
 NEXT_ACTION_INDEX = 55
 SECOND = 1000
+MAX_ITERATOR_DEPTH = 5
+VECTOR_SIZE = 718
 
 
 class TiramisuInterface:
@@ -26,13 +28,13 @@ class TiramisuInterface:
         self.current_branch_index = 0
         self.action_indices: list[int] = []
         self.initial_execution_time = median_execution_time(self.schedule)
-        self.branches = self.schedule_branches
+        # self.branches = self.schedule_branches
 
     @property
-    def schedule_branches(self) -> list[list[tiralib.IteratorIdentifier]]:
+    def branches(self) -> list[list[tiralib.IteratorIdentifier]]:
         branches = []
 
-        for sections in self.schedule.tree.get_candidate_sections().values():
+        for sections in self.tree.get_candidate_sections().values():
             branches.extend(sections)
 
         return branches
@@ -84,7 +86,8 @@ class TiramisuInterface:
             mask[ActionSlices.SKEWING] = 1
             mask[ActionSlices.TILING2D] = 1
 
-            iterator = self.tiramisu_program.tree.get_iterator_of_computation(
+            # get the leaf iterator of the current branch
+            iterator = self.tree.get_iterator_of_computation(
                 self.current_branch[0][0], self.current_branch[0][1]
             )
             # if node has children then mask Unrolling
@@ -92,13 +95,13 @@ class TiramisuInterface:
                 mask[ActionSlices.UNROLLING] = 1
 
         # mask levels that are not in current branch
-        levels = [level for level in range(5)]
+        # TODO this is a temporary solution, we need to find a better way handle iterator depth
+        levels = [level for level in range(MAX_ITERATOR_DEPTH)]
         for iterator in self.current_branch:
             levels.remove(iterator[1])
 
         for level in levels:
             mask[ActionSlices.REVERSAL.start + level] = 1
-            mask[ActionSlices.UNROLLING.start + level] = 1
 
             # only 2 actions for parallelization
             if level < 2:
@@ -123,12 +126,6 @@ class TiramisuInterface:
                     level, tuple_action_start_index
                 ):
                     mask[action_index] = 1
-
-        # Mask iterators with child iterators for Unrolling
-        for iterator in self.current_branch:
-            iterator_name = self.tree.get_iterator_of_computation(*iterator).name
-            if self.tree.iterators[iterator_name].child_iterators:
-                mask[ActionSlices.UNROLLING.start + iterator[1]] = 1
         return mask
 
     def _get_level_action_indices_tuple_actions(self, level: int, start_index: int):
@@ -144,33 +141,44 @@ class TiramisuInterface:
         return [start_index + level - 1, start_index + level]
 
     def _tree_to_iterator_vectors(self):
-        schedule_tree = self.tiramisu_program.tree
+        schedule_tree = self.tree
         it_dict = {}
-        iter_vector_size = 718
-        size_of_comp_vector = 709
         for it in schedule_tree.iterators:
-            single_iter_vector = -np.ones(iter_vector_size)
-            single_iter_vector[0] = 0
-            single_iter_vector[-9:] = 0
-            # lower value
-            single_iter_vector[size_of_comp_vector + 1] = schedule_tree.iterators[
-                it
-            ].lower_bound
-            # upper value
-            single_iter_vector[size_of_comp_vector + 2] = schedule_tree.iterators[
-                it
-            ].upper_bound
+            single_iter_vector = -np.ones(VECTOR_SIZE)
+            # Type 0 for iterators
+            single_iter_vector[IteratorTags.TYPE_TAG] = 0
+            # Initialize the non paddings tags to 0
+            # The focus tag is the first valid tag
+            single_iter_vector[IteratorTags.FOCUS_TAG :] = 0
+
+            lower_bound_is_int = isinstance(
+                schedule_tree.iterators[it].lower_bound, int
+            )
+            single_iter_vector[IteratorTags.LOWER_BOUND_IS_INT_TAG] = (
+                1 if lower_bound_is_int else 0
+            )
+            single_iter_vector[IteratorTags.LOWER_BOUND_VALUE_TAG] = (
+                schedule_tree.iterators[it].lower_bound
+            )
+            upper_bound_is_int = isinstance(
+                schedule_tree.iterators[it].upper_bound, int
+            )
+            single_iter_vector[IteratorTags.UPPER_BOUND_IS_INT_TAG] = (
+                1 if upper_bound_is_int else 0
+            )
+            single_iter_vector[IteratorTags.UPPER_BOUND_VALUE_TAG] = (
+                schedule_tree.iterators[it].upper_bound
+            )
             it_dict[it] = single_iter_vector
 
         return it_dict
 
-    def _schedule_to_comps_vectors(self):
+    def _annotations_to_comps_vectors(self):
         annotations = self.tiramisu_program.annotations
-        comp_vector_size = 718
-        max_depth = 5
+        max_depth = MAX_ITERATOR_DEPTH
         dict_comp = {}
         for comp in annotations["computations"]:
-            single_comp_vector = -np.ones(comp_vector_size)
+            single_comp_vector = -np.ones(VECTOR_SIZE)
             # This means that this vector has data related to a computation and not an iterator
             single_comp_vector[0] = 1
             comp_dict = annotations["computations"][comp]
@@ -208,10 +216,13 @@ class TiramisuInterface:
     @property
     def graph(self):
         it_vector_dict = self._tree_to_iterator_vectors()
-        comp_vector_dict = self._schedule_to_comps_vectors()
+        comp_vector_dict = self._annotations_to_comps_vectors()
         it_index = {}
         comp_index = {}
-        num_iterators = len(self.tiramisu_program.tree.iterators)
+        tree = self.tree
+        if not tree:
+            raise ValueError("Tree is not initialized")
+        num_iterators = len(tree.iterators)
         for i, iterator_id in enumerate(it_vector_dict):
             it_index[iterator_id] = i
         for i, comp in enumerate(comp_vector_dict):
@@ -220,8 +231,8 @@ class TiramisuInterface:
         edge_index = []
         node_feats = None
 
-        for iterator_id in self.tiramisu_program.tree.iterators:
-            iterator_node = self.tiramisu_program.tree.iterators[iterator_id]
+        for iterator_id in tree.iterators:
+            iterator_node = tree.iterators[iterator_id]
             for child_it in iterator_node.child_iterators:
                 edge_index.append([it_index[iterator_id], it_index[child_it]])
 
@@ -238,80 +249,55 @@ class TiramisuInterface:
 
         # focus on current branch
         for iterator in self.current_branch:
-            iterator_node = self.tiramisu_program.tree.get_iterator_of_computation(
-                iterator[0], iterator[1]
-            )
-            index = it_index[iterator_node.name]
-            node_feats[index][-9] = 1
+            index = it_index[iterator]
+            node_feats[index][IteratorTags.FOCUS_TAG] = 1
 
+        ## Removed because we are using the ISL tree to update the graph
+        ## and we do not pass any information of the applied transformations to the model.
         # apply previous actions of the schedule
-        for optim in self.schedule.optims_list:
-            match type(optim):
-                case tiralib.tiramisu_actions.Interchange:
-                    iterator_1 = self.tiramisu_program.tree.get_iterator_of_computation(
-                        *optim.params[0]
-                    )
-                    iterator_2 = self.tiramisu_program.tree.get_iterator_of_computation(
-                        *optim.params[1]
-                    )
-                    it1 = it_index[iterator_1.name]
-                    it2 = it_index[iterator_2.name]
-                    for edge in edge_index:
-                        if edge[0] == it1:
-                            edge[0] = it2
-                        elif edge[0] == it2:
-                            edge[0] = it1
-                        if edge[1] == it1:
-                            edge[1] = it2
-                        elif edge[1] == it2:
-                            edge[1] = it1
-
-                case tiralib.tiramisu_actions.Reversal:
-                    iterator = self.tiramisu_program.tree.get_iterator_of_computation(
-                        *optim.iterator_id
-                    )
-                    index = it_index[iterator.name]
-                    node_feats[index][-5] = 1
-
-                case tiralib.tiramisu_actions.Skewing:
-                    for iterator_id in optim.iterators:
-                        iterator = (
-                            self.tiramisu_program.tree.get_iterator_of_computation(
-                                *iterator_id
-                            )
-                        )
-                        index = it_index[iterator.name]
-                        node_feats[index][-2:] = optim.factors
-
-                case tiralib.tiramisu_actions.Parallelization:
-                    iterator = self.tiramisu_program.tree.get_iterator_of_computation(
-                        *optim.iterator_id
-                    )
-                    index = it_index[iterator.name]
-                    node_feats[index][-6] = 1
-
-                case tiralib.tiramisu_actions.Tiling2D:
-                    for iterator_id, tile_size in zip(
-                        optim.iterators, optim.tile_sizes
-                    ):
-                        iterator = (
-                            self.tiramisu_program.tree.get_iterator_of_computation(
-                                *iterator_id
-                            )
-                        )
-                        index = it_index[iterator.name]
-                        node_feats[index][-3] = tile_size
-
-                case tiralib.tiramisu_actions.Unrolling:
-                    assert isinstance(optim, tiralib.tiramisu_actions.Unrolling)
-                    iterator = self.tiramisu_program.tree.get_iterator_of_computation(
-                        *optim.iterator_id
-                    )
-                    index = it_index[iterator.name]
-                    node_feats[index][-4] = optim.unrolling_factor
-
-                case _:
-                    raise ValueError(f"Unsupported action {optim}")
+        # for optim in self.schedule.optims_list:
+        #     match type(optim):
+        #         case tiralib.tiramisu_actions.Interchange:
+        #             iterator_1 = tree.get_iterator_of_computation(*optim.params[0])
+        #             iterator_2 = tree.get_iterator_of_computation(*optim.params[1])
+        #             it1 = it_index[iterator_1.name]
+        #             it2 = it_index[iterator_2.name]
+        #             for edge in edge_index:
+        #                 if edge[0] == it1:
+        #                     edge[0] = it2
+        #                 elif edge[0] == it2:
+        #                     edge[0] = it1
+        #                 if edge[1] == it1:
+        #                     edge[1] = it2
+        #                 elif edge[1] == it2:
+        #                     edge[1] = it1
+        #         case tiralib.tiramisu_actions.Reversal:
+        #             iterator = tree.get_iterator_of_computation(*optim.iterator_id)
+        #             index = it_index[iterator.name]
+        #             node_feats[index][-5] = 1
+        #         case tiralib.tiramisu_actions.Skewing:
+        #             for iterator_id in optim.iterators:
+        #                 iterator = tree.get_iterator_of_computation(*iterator_id)
+        #                 index = it_index[iterator.name]
+        #                 node_feats[index][-2:] = optim.factors
+        #         case tiralib.tiramisu_actions.Parallelization:
+        #             iterator = tree.get_iterator_of_computation(*optim.iterator_id)
+        #             index = it_index[iterator.name]
+        #             node_feats[index][-6] = 1
+        #         case tiralib.tiramisu_actions.Tiling2D:
+        #             for iterator_id, tile_size in zip(
+        #                 optim.iterators, optim.tile_sizes
+        #             ):
+        #                 iterator = tree.get_iterator_of_computation(*iterator_id)
+        #                 index = it_index[iterator.name]
+        #                 node_feats[index][-3] = tile_size
+        #         case tiralib.tiramisu_actions.Unrolling:
+        #             assert isinstance(optim, tiralib.tiramisu_actions.Unrolling)
+        #             iterator = tree.get_iterator_of_computation(*optim.iterator_id)
+        #             index = it_index[iterator.name]
+        #             node_feats[index][-4] = optim.unrolling_factor
+        #         case _:
+        #             raise ValueError(f"Unsupported action {optim}")
 
         return node_feats, np.array(edge_index), it_index, comp_index
 
@@ -322,6 +308,8 @@ class TiramisuInterface:
             return ApplyActionResult(is_legal=True, speedup=1, done=True, crashed=False)
         self.action_indices.append(action)
         tmp_schedule = self.schedule.copy()
+
+        # if action is next action, move to next branch
         if action == NEXT_ACTION_INDEX:
             if self.current_branch_index + 1 >= len(self.branches):
                 return ApplyActionResult(
@@ -331,6 +319,8 @@ class TiramisuInterface:
             return ApplyActionResult(
                 is_legal=True, speedup=1, done=False, crashed=False
             )
+
+        # if action is not next action, apply the action
         try:
             tmp_schedule.add_optimizations(
                 [self.action_index_to_tiralib_action(action)]
@@ -415,14 +405,14 @@ class TiramisuInterface:
             factor = action_index - ActionSlices.UNROLLING.start
             # check if leaf of current branch does not have child iterators
             iterator_id = self.current_branch[-1]
-            iterator = self.tiramisu_program.tree.get_iterator_of_computation(
-                *iterator_id
-            )
+            iterator = self.tree.get_iterator_of_computation(*iterator_id)
             if iterator.child_iterators:
                 raise ValueError(
                     f"Cannot unroll iterator {iterator.name} with child iterators {iterator.child_iterators}"
                 )
             return tiralib.tiramisu_actions.Unrolling(params=[iterator_id, 2**factor])
+        else:
+            raise ValueError(f"Invalid action index {action_index}")
 
 
 def median_execution_time(
@@ -493,7 +483,7 @@ ApplyActionResult = namedtuple(
 def program_compatible_with_model(annotations):
     max_accesses = 15
     min_accesses = 0
-    max_iterators = 5
+    max_iterators = MAX_ITERATOR_DEPTH
     computations_dict = annotations["computations"]
 
     # Making sure every computation doesn't exceed the limit of the cost model , if the model is updated change the conditions
@@ -508,3 +498,22 @@ def program_compatible_with_model(annotations):
             return False
 
     return True
+
+
+class IteratorTags:
+    """The tags of the iterator embeddings.
+
+    The embedding is of size 718. The rest of the tags are set to -1 as padding."""
+
+    TYPE_TAG = 0
+    FOCUS_TAG = -11
+    LOWER_BOUND_IS_INT_TAG = -10
+    LOWER_BOUND_VALUE_TAG = -9
+    UPPER_BOUND_IS_INT_TAG = -8
+    UPPER_BOUND_VALUE_TAG = -7
+    PARALLELIZATION_TAG = -6
+    REVERSAL_TAG = -5
+    UNROLLING_FACTOR_TAG = -4
+    TILE_SIZE_TAG = -3
+    SKEWING_FACTOR_1_TAG = -2
+    SKEWING_FACTOR_2_TAG = -1

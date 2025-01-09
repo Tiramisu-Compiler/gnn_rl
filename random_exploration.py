@@ -7,7 +7,7 @@ import argparse as arg
 import ray
 import torch
 from config.config import Config
-from agent.rollout_worker import RolloutWorker, Transition
+from agent.rollout_worker import RolloutWorker
 from utils.dataset_actor.dataset_actor import DatasetActor
 
 

@@ -134,10 +134,10 @@ class GAT(nn.Module):
     def forward(self, data, actions_mask=None, action=None):
         weights = self.shared_layers(data)
         logits = self.π(weights)
-        if actions_mask != None:
+        if actions_mask is not None:
             logits = logits - actions_mask * 1e8
         probs = Categorical(logits=logits)
-        if action == None:
+        if action is None:
             action = probs.sample()
         value = self.v(weights)
         return action, probs.log_prob(action), probs.entropy(), value

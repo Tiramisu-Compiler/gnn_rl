@@ -126,15 +126,15 @@ class RolloutWorker:
 
             self.state = (new_node_feats, new_edge_index, it_index)
 
-            print(f"Current Action : {action}")
-            print(f"Current Action sequence : {self.tiramisu_interface.action_indices}")
-            log_trajectory += (
+            current_log = (
                 f"\nStep : {self.steps}"
                 + f"\nAction ID : {action}"
                 + f"\nLegality : {result.is_legal}"
                 + f"\nActions Sequence So far : {self.tiramisu_interface.action_indices}"
                 + "\n"
             )
+            print(current_log)
+            log_trajectory += current_log
 
             if self.steps == 40:
                 done = True

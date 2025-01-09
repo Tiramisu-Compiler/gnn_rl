@@ -158,7 +158,7 @@ class TiramisuInterface:
                 1 if lower_bound_is_int else 0
             )
             single_iter_vector[IteratorTags.LOWER_BOUND_VALUE_TAG] = (
-                schedule_tree.iterators[it].lower_bound
+                (schedule_tree.iterators[it].lower_bound) if lower_bound_is_int else 0
             )
             upper_bound_is_int = isinstance(
                 schedule_tree.iterators[it].upper_bound, int
@@ -167,7 +167,7 @@ class TiramisuInterface:
                 1 if upper_bound_is_int else 0
             )
             single_iter_vector[IteratorTags.UPPER_BOUND_VALUE_TAG] = (
-                schedule_tree.iterators[it].upper_bound
+                (schedule_tree.iterators[it].upper_bound) if upper_bound_is_int else 0
             )
             it_dict[it] = single_iter_vector
 

@@ -9,7 +9,7 @@ from agent.graph_utils import encode_data_type, isl_to_write_matrix, pad_access_
 NEXT_ACTION_INDEX = 55
 SECOND = 1000
 MAX_ITERATOR_DEPTH = 5
-VECTOR_SIZE = 718
+VECTOR_SIZE = 720
 
 
 class TiramisuInterface:
@@ -98,6 +98,8 @@ class TiramisuInterface:
         # TODO this is a temporary solution, we need to find a better way handle iterator depth
         levels = [level for level in range(MAX_ITERATOR_DEPTH)]
         for iterator in self.current_branch:
+            if iterator[1] not in levels:
+                print(f"iterator {iterator} not in levels {levels}")
             levels.remove(iterator[1])
 
         for level in levels:
@@ -503,7 +505,7 @@ def program_compatible_with_model(annotations):
 class IteratorTags:
     """The tags of the iterator embeddings.
 
-    The embedding is of size 718. The rest of the tags are set to -1 as padding."""
+    The embedding is of size VECTOR_SIZE. The rest of the tags are set to -1 as padding."""
 
     TYPE_TAG = 0
     FOCUS_TAG = -11

@@ -53,7 +53,7 @@ class DatasetActor:
     def get_dataset_size(self) -> int:
         return self.dataset_service.dataset_size
 
-    def get_function_by_name(self, function_name: str):
+    def get_function_by_name(self, function_name: str) -> tuple[str, dict, str]:
         return self.dataset_service.get_function_by_name(function_name)
 
 

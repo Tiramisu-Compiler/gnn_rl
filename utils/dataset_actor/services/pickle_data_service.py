@@ -73,5 +73,5 @@ class PickleDataService(BaseDataService):
 
         return function_name, self.dataset[function_name], self.cpps[function_name]
 
-    def get_function_by_name(self, function_name: str) -> tuple[dict, str]:
+    def get_function_by_name(self, function_name: str) -> tuple[str, dict, str]:
         return function_name, self.dataset[function_name], self.cpps[function_name]

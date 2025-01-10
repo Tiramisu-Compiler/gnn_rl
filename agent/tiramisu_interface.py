@@ -304,6 +304,7 @@ class TiramisuInterface:
         return node_feats, np.array(edge_index), it_index, comp_index
 
     def apply_action(self, action: int):
+        done = False
         mask = self.get_mask()
         if np.all(mask == 1):
             logger.warning("All actions are masked")
@@ -336,8 +337,11 @@ class TiramisuInterface:
             speedup = median_execution_time(tmp_schedule) / self.initial_execution_time
             self.schedule = tmp_schedule
 
+            if self.schedule.tree.depth > MAX_ITERATOR_DEPTH:
+                done = True
+
             return ApplyActionResult(
-                is_legal=True, speedup=speedup, done=False, crashed=False
+                is_legal=True, speedup=speedup, done=done, crashed=False
             )
         except Exception as e:
             logger.error(f"Error applying action {action}: {e}")

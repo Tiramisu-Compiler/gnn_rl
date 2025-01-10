@@ -54,7 +54,7 @@ if "__main__" == __name__:
     dataset_worker = DatasetActorRemote.remote(Config.config.dataset)
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=128, num_outputs=56).to(
+    ppo_agent = GAT(input_size=720, num_heads=4, hidden_size=128, num_outputs=56).to(
         device
     )
     optimizer = torch.optim.Adam(

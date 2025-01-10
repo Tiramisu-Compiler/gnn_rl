@@ -121,10 +121,15 @@ class RolloutWorker:
                     prev_actions_mask,
                 )
             )
+            if self.steps == 40:
+                done = True
 
-            new_node_feats, new_edge_index, it_index, _ = self.tiramisu_interface.graph
+            if not done:
+                new_node_feats, new_edge_index, it_index, _ = (
+                    self.tiramisu_interface.graph
+                )
 
-            self.state = (new_node_feats, new_edge_index, it_index)
+                self.state = (new_node_feats, new_edge_index, it_index)
 
             current_log = (
                 f"\nStep : {self.steps}"
@@ -135,9 +140,6 @@ class RolloutWorker:
             )
             print(current_log)
             log_trajectory += current_log
-
-            if self.steps == 40:
-                done = True
 
         # else:
         #     schedule_object = self.tiramisu_api.scheduler_service.schedule_object

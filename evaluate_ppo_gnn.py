@@ -47,7 +47,7 @@ if "__main__" == __name__:
     dataset_worker = DatasetActor.remote(Config.config.dataset)
     device = "cpu"
 
-    ppo_agent = GAT(input_size=718, num_heads=4, hidden_size=128, num_outputs=56).to(
+    ppo_agent = GAT(input_size=720, num_heads=4, hidden_size=128, num_outputs=56).to(
         device
     )
 

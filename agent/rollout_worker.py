@@ -79,6 +79,8 @@ class RolloutWorker:
         done = False
         log_trajectory = "#" * 50
         log_trajectory += f"\nFunction  : {self.current_program}"
+        print("\n")
+        print("#" * 50)
         print(f"Function : {self.current_program}")
         print(f"trajectory : {trajectory}")
 
@@ -100,6 +102,8 @@ class RolloutWorker:
                 action = action.item()
                 action_log_prob = action_log_prob.item()
                 value = value.item()
+
+            print(f"Running Action : {action}")
 
             result = self.tiramisu_interface.apply_action(action)
 

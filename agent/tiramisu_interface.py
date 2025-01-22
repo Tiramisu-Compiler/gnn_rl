@@ -156,6 +156,7 @@ class TiramisuInterface:
             lower_bound_is_int = isinstance(
                 schedule_tree.iterators[it].lower_bound, int
             )
+            # TODO Create a better embedding for non rectangular domains
             single_iter_vector[IteratorTags.LOWER_BOUND_IS_INT_TAG] = (
                 1 if lower_bound_is_int else 0
             )
@@ -165,6 +166,7 @@ class TiramisuInterface:
             upper_bound_is_int = isinstance(
                 schedule_tree.iterators[it].upper_bound, int
             )
+            # TODO Create a better embedding for non rectangular domains
             single_iter_vector[IteratorTags.UPPER_BOUND_IS_INT_TAG] = (
                 1 if upper_bound_is_int else 0
             )
@@ -175,19 +177,28 @@ class TiramisuInterface:
 
         return it_dict
 
+    # TODO recompute the annotations in tiramisu after schedule is applied
+    def _get_comp_annotations(self, comp: str):
+        if comp in self.annotations["computations"]:
+            return self.annotations["computations"][comp]
+        else:
+            for initial_comp in self.annotations["computations"]:
+                if initial_comp in comp:
+                    return self.annotations["computations"][initial_comp]
+        raise ValueError(f"Computation {comp} not found in annotations")
+
     def _annotations_to_comps_vectors(self):
-        annotations = self.tiramisu_program.annotations
         max_depth = MAX_ITERATOR_DEPTH
         dict_comp = {}
-        for comp in annotations["computations"]:
+        comps = self.tree.computations
+        for comp in comps:
             single_comp_vector = -np.ones(VECTOR_SIZE)
             # This means that this vector has data related to a computation and not an iterator
             single_comp_vector[0] = 1
-            comp_dict = annotations["computations"][comp]
+
+            comp_dict = self._get_comp_annotations(comp)
             # This field represents the absolute order of execution of computations
-            single_comp_vector[1] = (
-                self.tiramisu_program.tree.computations_absolute_order[comp]
-            )
+            single_comp_vector[1] = self.tree.computations_absolute_order[comp]
             # a vector of one-hot encoding of possible 3 data-types
             single_comp_vector[2:5] = encode_data_type(comp_dict["data_type"])
             single_comp_vector[5] = +comp_dict["comp_is_reduction"]
@@ -337,6 +348,7 @@ class TiramisuInterface:
             speedup = median_execution_time(tmp_schedule) / self.initial_execution_time
             self.schedule = tmp_schedule
 
+            # TODO Handle the depth of the tree dyamically or in a better way
             if self.schedule.tree.depth > MAX_ITERATOR_DEPTH:
                 done = True
 
@@ -419,6 +431,10 @@ class TiramisuInterface:
             return tiralib.tiramisu_actions.Unrolling(params=[iterator_id, 2**factor])
         else:
             raise ValueError(f"Invalid action index {action_index}")
+
+    @property
+    def annotations(self):
+        return self.tiramisu_program.annotations
 
 
 def median_execution_time(

@@ -162,9 +162,10 @@ class RolloutWorker:
         for filename in Path(Config.config.tiramisu.workspace).glob("*"):
             if self.current_program in filename.name:
                 filename.unlink()
-
+        print(f"End of episode : {self.current_program}")
         print(f"Schedule : {self.tiramisu_interface.schedule}")
         print(f"actions : {self.tiramisu_interface.action_indices}")
+        print(f"Speedup : {self.previous_speedup}")
         return {
             "trajectory": trajectory,
             "speedup": self.previous_speedup,
@@ -192,6 +193,9 @@ class RolloutWorker:
         instant_speedup = np.clip(instant_speedup, 0, max_speedup)
 
         reward = math.log(instant_speedup, log_base)
+        logger.info(
+            f"Reward : {reward}, Total Speedup : {total_speedup}, instant_speedup : {instant_speedup}"
+        )
 
         return reward
 

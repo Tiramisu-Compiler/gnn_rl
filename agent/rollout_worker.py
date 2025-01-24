@@ -159,9 +159,10 @@ class RolloutWorker:
 
         # clean up created files
         # delete files with the filename in workspace
-        for filename in Path(Config.config.tiramisu.workspace).glob("*"):
-            if self.current_program in filename.name:
-                filename.unlink()
+        if Config.config.clean_files:
+            for filename in Path(Config.config.tiramisu.workspace).glob("*"):
+                if self.current_program in filename.name:
+                    filename.unlink()
         print(f"End of episode : {self.current_program}")
         print(f"Schedule : {self.tiramisu_interface.schedule}")
         print(f"actions : {self.tiramisu_interface.action_indices}")

@@ -79,6 +79,7 @@ class AutoSchedulerConfig:
     test: Test
     machine: str = "jubail"
     tiralib_config_path: str = "./config/tiralib_config.yaml"
+    clean_files: bool = True
 
     def __post_init__(self):
         if isinstance(self.tiramisu, dict):
@@ -109,7 +110,20 @@ def dict_to_config(parsed_yaml: Dict[Any, Any]) -> AutoSchedulerConfig:
     code_deps = CodeDeps(**parsed_yaml["code_deps"])
     test = Test(**parsed_yaml["test"])
     machine = parsed_yaml.get("machine", "jubail")
-    return AutoSchedulerConfig(tiramisu, dataset, experiment, code_deps, test, machine)
+    clean_files = parsed_yaml.get("clean_files", True)
+    tiralib_config_path = parsed_yaml.get(
+        "tiralib_config_path", "./config/tiralib_config.yaml"
+    )
+    return AutoSchedulerConfig(
+        tiramisu,
+        dataset,
+        experiment,
+        code_deps,
+        test,
+        machine,
+        tiralib_config_path,
+        clean_files,
+    )
 
 
 class Config(object):

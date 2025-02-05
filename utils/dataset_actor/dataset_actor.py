@@ -1,4 +1,5 @@
 import config.config as cfg
+from utils.dataset_actor.services.base_data_service import TiramisuProgramCache
 from utils.dataset_actor.services.hybrid_data_service import HybridDataService
 from utils.dataset_actor.services.pickle_data_service import PickleDataService
 import ray
@@ -53,7 +54,9 @@ class DatasetActor:
     def get_dataset_size(self) -> int:
         return self.dataset_service.dataset_size
 
-    def get_function_by_name(self, function_name: str) -> tuple[str, dict, str]:
+    def get_function_by_name(
+        self, function_name: str
+    ) -> tuple[str, TiramisuProgramCache, str]:
         return self.dataset_service.get_function_by_name(function_name)
 
 

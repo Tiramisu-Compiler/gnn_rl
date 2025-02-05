@@ -29,7 +29,7 @@ class TiramisuConfig:
 
 @dataclass
 class DatasetConfig:
-    dataset_format: DatasetFormat = DatasetFormat.HYBRID
+    dataset_format: DatasetFormat = DatasetFormat.PICKLE
     cpps_path: str = ""
     dataset_path: str = ""
     save_path: str = ""

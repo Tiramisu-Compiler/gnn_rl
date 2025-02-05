@@ -5,6 +5,7 @@ import numpy as np
 
 from utils.dataset_actor.services.base_data_service import (
     BaseDataService,
+    TiramisuProgramCache,
 )
 
 
@@ -48,19 +49,17 @@ class HybridDataService(BaseDataService):
     # Returns next function name, function data, and function cpps
     def get_next_function(self, random=False):
         if random:
-            function_name = np.random.choice(self.function_names)
+            function_name: str = np.random.choice(self.function_names)
         # Choose the next function sequentially
         else:
-            function_name = self.function_names[
+            function_name: str = self.function_names[
                 self.current_function_index % self.dataset_size
             ]
             self.current_function_index += 1
 
-        # print(
-        #     f"Selected function with index: {self.current_function_index}, name: {function_name}"
-        # )
-        if function_name in self.dataset:
-            # If the function doesn't exit in the dataset it will be compiled automatically
-            return function_name, self.dataset[function_name], None
-        else:
-            return function_name, None, None
+        # If the function doesn't exit in the dataset it will be compiled automatically
+        return (
+            function_name,
+            TiramisuProgramCache(**self.dataset[function_name]),
+            None,
+        )

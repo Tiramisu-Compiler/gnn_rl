@@ -4,6 +4,7 @@ import random
 import numpy as np
 from utils.dataset_actor.services.base_data_service import (
     BaseDataService,
+    TiramisuProgramCache,
 )
 
 
@@ -57,7 +58,7 @@ class PickleDataService(BaseDataService):
         self.dataset_size = len(self.function_names)
 
     # Returns next function name, function data, and function cpps
-    def get_next_function(self, random=False) -> tuple[str, dict, str]:
+    def get_next_function(self, random=False):
         if random:
             function_name: str = np.random.choice(self.function_names)
         # Choose the next function sequentially
@@ -67,11 +68,15 @@ class PickleDataService(BaseDataService):
             ]
             self.current_function_index += 1
 
-        # print(
-        #     f"Selected function with index: {self.current_function_index}, name: {function_name}"
-        # )
+        return (
+            function_name,
+            TiramisuProgramCache(**self.dataset[function_name]),
+            self.cpps[function_name],
+        )
 
-        return function_name, self.dataset[function_name], self.cpps[function_name]
-
-    def get_function_by_name(self, function_name: str) -> tuple[str, dict, str]:
-        return function_name, self.dataset[function_name], self.cpps[function_name]
+    def get_function_by_name(self, function_name: str):
+        return (
+            function_name,
+            TiramisuProgramCache(**self.dataset[function_name]),
+            self.cpps[function_name],
+        )

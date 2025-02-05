@@ -59,11 +59,16 @@ class RolloutWorker:
                     self.dataset_worker.get_next_function.remote()
                 )
 
-            annotations = function_data["program_annotation"]
+            annotations = function_data.program_annotation
             model_compatible_program = program_compatible_with_model(annotations)
 
         self.current_program = function_name
-        self.tiramisu_interface = TiramisuInterface(cpp_code, self.tiralib_config_path)
+        self.tiramisu_interface = TiramisuInterface(
+            cpp_code,
+            self.tiralib_config_path,
+            cache=function_data,
+            machine=Config.config.machine,
+        )
 
         node_feats, edge_index, it_index, comp_index = self.tiramisu_interface.graph
 
@@ -145,17 +150,17 @@ class RolloutWorker:
             print(current_log)
             log_trajectory += current_log
 
-        # else:
-        #     schedule_object = self.tiramisu_api.scheduler_service.schedule_object
-
-        #     tiramisu_program_dict = (
-        #         self.tiramisu_api.get_current_tiramisu_program_dict()
-        #     )
-        #     ray.get(
-        #         self.dataset_worker.update_dataset.remote(
-        #             self.current_program, tiramisu_program_dict
-        #         )
-        #     )
+        else:
+            if type(self.dataset_worker) == DatasetActor:
+                self.dataset_worker.update_dataset(
+                    self.current_program, self.tiramisu_interface.cache.to_dict()
+                )
+            else:
+                ray.get(
+                    self.dataset_worker.update_dataset.remote(
+                        self.current_program, self.tiramisu_interface.cache.to_dict()
+                    )
+                )
 
         # clean up created files
         # delete files with the filename in workspace

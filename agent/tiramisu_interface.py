@@ -4,6 +4,7 @@ from ray import logger
 import tiralib.tiramisu as tiralib
 import tiralib.config as tiralib_config
 from agent.graph_utils import encode_data_type, isl_to_write_matrix, pad_access_matrix
+from utils.dataset_actor.dataset_actor import TiramisuProgramCache
 
 
 NEXT_ACTION_INDEX = 55
@@ -13,22 +14,61 @@ VECTOR_SIZE = 720
 
 
 class TiramisuInterface:
-    def __init__(self, cpp_code: str, tiralib_config_path: str):
+    def __init__(
+        self,
+        cpp_code: str,
+        tiralib_config_path: str,
+        cache: TiramisuProgramCache | None = None,
+        machine: str = "jubail",
+    ):
         tiralib_config.BaseConfig.init(tiralib_config_path)
-        self.tiramisu_program = tiralib.TiramisuProgram.init_server(
-            original_code=cpp_code,
-            load_isl_ast=True,
-            load_tree=True,
-            load_annotations=True,
-            reuse_server=True,
-        )
-
-        self.schedule = tiralib.Schedule(self.tiramisu_program)
-        self.transformed_iterators: set[tiralib.IteratorIdentifier] = set()
         self.current_branch_index = 0
         self.action_indices: list[int] = []
-        self.initial_execution_time = median_execution_time(self.schedule)
+        self._initial_execution_time: float | None = None
+        self.cache = cache
+        self.machine = machine
+        if self.cache:
+            self.tiramisu_program = tiralib.TiramisuProgram.from_annotations(
+                self.cache.program_annotation, cpp_code=cpp_code, load_tree=True
+            )
+        else:
+            self.tiramisu_program = tiralib.TiramisuProgram.init_server(
+                cpp_code=cpp_code,
+                load_isl_ast=True,
+                load_tree=True,
+                load_annotations=True,
+                reuse_server=True,
+            )
+
+        self.schedule = tiralib.Schedule(self.tiramisu_program)
+
         # self.branches = self.schedule_branches
+
+    @property
+    def server(self):
+        if not self.tiramisu_program.server:
+            self.tiramisu_program.server = tiralib.FunctionServer(
+                self.tiramisu_program, reuse_server=True
+            )
+        return self.tiramisu_program.server
+
+    @property
+    def initial_execution_time(self):
+        if not self._initial_execution_time:
+            if self.cache:
+                self._initial_execution_time = self.cache.execution_time(
+                    self.machine, "empty"
+                )
+            if not self._initial_execution_time:
+                _ = self.server
+                self._initial_execution_time = median_execution_time(self.schedule)
+                if self.cache:
+                    self.cache.add_execution_time(
+                        self.machine,
+                        "empty",
+                        self._initial_execution_time,
+                    )
+        return self._initial_execution_time
 
     @property
     def branches(self) -> list[list[tiralib.IteratorIdentifier]]:
@@ -339,13 +379,28 @@ class TiramisuInterface:
             tmp_schedule.add_optimizations(
                 [self.action_index_to_tiralib_action(action)]
             )
-            is_legal = tmp_schedule.is_legal(with_ast=True)
+            is_legal = self.schedule_is_legal(tmp_schedule)
             if not is_legal:
                 return ApplyActionResult(
                     is_legal=False, speedup=1, done=False, crashed=False
                 )
+            tmp_schedule_str = str(tmp_schedule)
+            if self.cache and (
+                cached_exec_time := self.cache.execution_time(
+                    self.machine, tmp_schedule_str
+                )
+                is not None
+            ):
+                current_execution_time = cached_exec_time
+            else:
+                _ = self.server
+                current_execution_time = median_execution_time(tmp_schedule)
+                if self.cache:
+                    self.cache.add_execution_time(
+                        self.machine, tmp_schedule_str, current_execution_time
+                    )
 
-            speedup = median_execution_time(tmp_schedule) / self.initial_execution_time
+            speedup = current_execution_time / self.initial_execution_time
             self.schedule = tmp_schedule
 
             # TODO Handle the depth of the tree dyamically or in a better way
@@ -436,6 +491,51 @@ class TiramisuInterface:
     def annotations(self):
         return self.tiramisu_program.annotations
 
+    def schedule_is_legal(self, schedule: tiralib.Schedule):
+        """
+        Checks if the schedule is legal.
+
+        Returns
+        -------
+        Boolean indicating if the schedule is legal.
+        """
+        schedule_str = str(schedule)
+        is_legal = None
+        if self.cache:
+            is_legal = self.cache.schedules_legality.get(schedule_str, None)
+            isl_ast_str = self.cache.isl_ast.get(schedule_str, None)
+            skewing_factors = self.cache.schedules_solver.get(schedule_str, None)
+
+        if is_legal is None:
+            result = self.server.run("legality", schedule)
+            is_legal: bool = result.legality
+            isl_ast_str: str = result.isl_ast
+            skewing_factors = None
+            if result.additional_info and "skewing_factors" in result.additional_info:
+                skewing_factors = [
+                    int(factor)
+                    for factor in result.additional_info.replace(
+                        "skewing_factors:", ""
+                    ).split(",")
+                ]
+            if self.cache:
+                self.cache.add(schedule_str, is_legal, isl_ast_str, skewing_factors)
+
+        schedule.legality = is_legal
+        schedule.tree = tiralib.tiramisu_tree.TiramisuTree.from_isl_ast_string_list(
+            isl_ast_string_list=isl_ast_str.split("\n")
+        )
+        # Update the skewing factors if they are not set
+        if skewing_factors:
+            for action in schedule.optims_list:
+                if action.type == tiralib.tiramisu_actions.TiramisuActionType.SKEWING:
+                    if action.params[2] == 0:
+                        action.params[2] = skewing_factors[0]
+                        action.params[3] = skewing_factors[1]
+                        action.factors = skewing_factors
+                        action.set_string_representations(schedule.tree)
+        return is_legal
+
 
 def median_execution_time(
     schedule: tiralib.Schedule,
@@ -448,7 +548,7 @@ def median_execution_time(
         max_runs=max_runs,
         time_budget=time_budget_in_seconds * SECOND,
     )
-    return np.median(execution_times)
+    return float(np.median(execution_times))
 
 
 class ActionSlices:

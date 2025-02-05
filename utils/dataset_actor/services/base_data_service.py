@@ -1,6 +1,52 @@
 from abc import abstractmethod
+from dataclasses import asdict, dataclass
 from pathlib import Path
 import pickle
+from typing import Any
+
+
+@dataclass
+class TiramisuProgramCache:
+    execution_times: dict[str, dict[str, float]]
+    program_annotation: dict[str, Any]
+    schedules_legality: dict[str, bool]
+    schedules_solver: dict[str, tuple[int, int]]
+    tags: set[str]
+    isl_ast: dict[str, str]
+
+    def machine_execution_times(self, machine: str):
+        return self["execution_times"].get(machine, {})
+
+    def add(
+        self,
+        schedule_str: str,
+        is_legal: bool | None = None,
+        isl_ast_str: str | None = None,
+        skewing_factors: tuple[int, int] | None = None,
+    ):
+        if is_legal is not None:
+            self.schedules_legality[schedule_str] = is_legal
+        if isl_ast_str is not None:
+            self.isl_ast[schedule_str] = isl_ast_str
+        if skewing_factors is not None:
+            self.schedules_solver[schedule_str] = skewing_factors
+
+    def add_execution_time(
+        self, machine: str, schedule_str: str, execution_time: float
+    ):
+        if machine not in self.execution_times:
+            self.execution_times[machine] = {}
+        self.execution_times[machine][schedule_str] = execution_time
+
+    def execution_time(self, machine: str, schedule_str: str) -> float | None:
+        return self.execution_times.get(machine, {}).get(schedule_str, None)
+
+    def to_dict(self):
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(**d)
 
 
 class BaseDataService:
@@ -26,7 +72,7 @@ class BaseDataService:
         self.dataset_name = dataset_path.split("/")[-1].split(".")[0]
 
     @abstractmethod
-    def get_next_function(self, random=False) -> tuple[str, dict, str]:
+    def get_next_function(self, random=False) -> tuple[str, TiramisuProgramCache, str]:
         pass
 
     # Update the dataset with the new function

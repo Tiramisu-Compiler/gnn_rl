@@ -12,14 +12,28 @@ mlflow = "2.8.1"
 torch = "1.12.0"
 torch-geometric = "2.4.0"
 ray = { version = "2.3.0", extras = ["rllib"] }
-tiralib = {git = "https://github.com/Tiramisu-Compiler/TiraLib"}
+tiralib = { git = "https://github.com/Tiramisu-Compiler/TiraLib" }
 
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
 ruff = "^0.7.4"
 ipykernel = "^6.29.5"
+pytest-cov = "^6.0.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+
+[tool.coverage.run]
+branch = true
+source = ["agent", "config", "utils"]
+
+# [tool.coverage.report]
+# # omit main.py from coverage report
+# omit = ["tiralib/main.py"]
+
+[tool.pytest.ini_options]
+addopts = "--cov --cov-report=lcov:lcov.info --cov-report=term"
+testpaths = ["tests"]

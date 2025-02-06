@@ -1,6 +1,9 @@
 from collections import namedtuple
+from dataclasses import dataclass, field
+import json
 import logging
 from pathlib import Path
+from time import time
 
 import ray
 import numpy as np
@@ -19,6 +22,27 @@ Transition = namedtuple(
     "Transition",
     ("state", "action", "reward", "value", "log_prob", "entropy", "actions_mask"),
 )
+
+
+@dataclass
+class TimePerStage:
+    graph: float = 0.0
+    get_next_function: float = 0.0
+    tiramisu_interface_init: float = 0.0
+    model_eval: float = 0.0
+    get_mask: list[float] = field(default_factory=list)
+    get_action: list[float] = field(default_factory=list)
+    apply_action: list[float] = field(default_factory=list)
+    reward_process: list[float] = field(default_factory=list)
+    get_next_state: list[float] = field(default_factory=list)
+    rollout: float = 0.0
+    update_dataset: float = 0.0
+
+    def __repr__(self):
+        return json.dumps(self.__dict__, indent=4)
+
+    def __str__(self):
+        return json.dumps(self.__dict__)
 
 
 class RolloutWorker:
@@ -42,11 +66,14 @@ class RolloutWorker:
         self.state = None
         self.previous_speedup = None
         self.steps = None
+        self.times_per_stages = TimePerStage()
 
         # Initializing values and the episode
         self.reset(function_name)
 
     def reset(self, function_name: str = None):
+        self.times_per_stages = TimePerStage()
+        start_time = time()
         model_compatible_program = False
         while not model_compatible_program:
             logger.info("Getting next function")
@@ -61,6 +88,9 @@ class RolloutWorker:
 
             annotations = function_data.program_annotation
             model_compatible_program = program_compatible_with_model(annotations)
+        end_time = time()
+        self.times_per_stages.get_next_function = end_time - start_time
+        start_time = end_time
 
         self.current_program = function_name
         self.tiramisu_interface = TiramisuInterface(
@@ -69,6 +99,9 @@ class RolloutWorker:
             cache=function_data,
             machine=Config.config.machine,
         )
+        end_time = time()
+        self.times_per_stages.tiramisu_interface_init = end_time - start_time
+        start_time = end_time
 
         node_feats, edge_index, it_index, comp_index = self.tiramisu_interface.graph
 
@@ -76,8 +109,11 @@ class RolloutWorker:
         self.steps = 0
         self.state = (node_feats, edge_index, it_index)
         self.previous_action = None
+        self.times_per_stages.graph = time() - start_time
 
     def rollout(self, model: nn.Module, device: str):
+        rollout_start_time = time()
+        start_time = rollout_start_time
         model.to(device)
         model.eval()
         trajectory = []
@@ -88,9 +124,14 @@ class RolloutWorker:
         print("#" * 50)
         print(f"Function : {self.current_program}")
         print(f"trajectory : {trajectory}")
-
+        end_time = time()
+        self.times_per_stages.model_eval = end_time - start_time
+        start_time = end_time
         while not done:
             prev_actions_mask = self.tiramisu_interface.get_mask()
+            end_time = time()
+            self.times_per_stages.get_mask.append(end_time - start_time)
+            start_time = end_time
             self.steps += 1
             (node_feats, edge_index, it_index) = self.state
             data = Data(
@@ -102,15 +143,21 @@ class RolloutWorker:
 
             with torch.no_grad():
                 action, action_log_prob, entropy, value = model(
-                    data, torch.tensor(self.tiramisu_interface.get_mask()).to(device)
+                    data, torch.tensor(prev_actions_mask).to(device)
                 )
                 action = action.item()
                 action_log_prob = action_log_prob.item()
                 value = value.item()
+            end_time = time()
+            self.times_per_stages.get_action.append(end_time - start_time)
+            start_time = end_time
 
             print(f"Running Action : {action}")
 
             result = self.tiramisu_interface.apply_action(action)
+            end_time = time()
+            self.times_per_stages.apply_action.append(end_time - start_time)
+            start_time = end_time
 
             done = result.done
             if result.crashed:
@@ -118,6 +165,9 @@ class RolloutWorker:
                 continue
 
             reward = self.reward_process(action, result.is_legal, result.speedup)
+            end_time = time()
+            self.times_per_stages.reward_process.append(end_time - start_time)
+            start_time = end_time
 
             trajectory.append(
                 (
@@ -139,6 +189,9 @@ class RolloutWorker:
                 )
 
                 self.state = (new_node_feats, new_edge_index, it_index)
+                end_time = time()
+                self.times_per_stages.get_next_state.append(end_time - start_time)
+            start_time = time()
 
             current_log = (
                 f"\nStep : {self.steps}"
@@ -151,16 +204,21 @@ class RolloutWorker:
             log_trajectory += current_log
 
         else:
-            if type(self.dataset_worker) == DatasetActor:
-                self.dataset_worker.update_dataset(
-                    self.current_program, self.tiramisu_interface.cache.to_dict()
-                )
-            else:
-                ray.get(
-                    self.dataset_worker.update_dataset.remote(
+            start_time = time()
+            self.times_per_stages.rollout = start_time - rollout_start_time
+            if self.tiramisu_interface.cache:
+                if type(self.dataset_worker) == DatasetActor:
+                    self.dataset_worker.update_dataset(
                         self.current_program, self.tiramisu_interface.cache.to_dict()
                     )
-                )
+                else:
+                    ray.get(
+                        self.dataset_worker.update_dataset.remote(
+                            self.current_program,
+                            self.tiramisu_interface.cache.to_dict(),
+                        )
+                    )
+                self.times_per_stages.update_dataset = time() - start_time
 
         # clean up created files
         # delete files with the filename in workspace
@@ -172,6 +230,7 @@ class RolloutWorker:
         print(f"Schedule : {self.tiramisu_interface.schedule}")
         print(f"actions : {self.tiramisu_interface.action_indices}")
         print(f"Speedup : {self.previous_speedup}")
+        print(f"Time per stage for {self.current_program} : {self.times_per_stages}")
         return {
             "trajectory": trajectory,
             "speedup": self.previous_speedup,

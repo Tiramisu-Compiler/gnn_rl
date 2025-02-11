@@ -25,3 +25,5 @@ experiment:
 
 test : 
     skip_execute_schedules : False
+
+tiralib_config_path: path to tiralib config file

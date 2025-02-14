@@ -148,9 +148,9 @@ if "__main__" == __name__:
                 )
 
                 for result in results:
-                    b_speedups.append(math.log(result["speedup"], 4))
-                    trajectory_len = len(result["trajectory"])
-                    full_trajectory = Transition(*zip(*result["trajectory"]))
+                    b_speedups.append(math.log(result.speedup, 4))
+                    trajectory_len = len(result.trajectory)
+                    full_trajectory = Transition(*zip(*result.trajectory))
                     avg_episode_length = (m * avg_episode_length) / (
                         m + 1
                     ) + trajectory_len / (m + 1)

@@ -400,7 +400,7 @@ class TiramisuInterface:
                         self.machine, tmp_schedule_str, current_execution_time
                     )
 
-            speedup = current_execution_time / self.initial_execution_time
+            speedup = self.initial_execution_time / current_execution_time
             self.schedule = tmp_schedule
 
             # TODO Handle the depth of the tree dyamically or in a better way

@@ -207,7 +207,7 @@ class RolloutWorker:
             start_time = time()
             self.times_per_stages.rollout = start_time - rollout_start_time
             if self.tiramisu_interface.cache:
-                if type(self.dataset_worker) == DatasetActor:
+                if type(self.dataset_worker) is DatasetActor:
                     self.dataset_worker.update_dataset(
                         self.current_program, self.tiramisu_interface.cache.to_dict()
                     )
@@ -231,12 +231,13 @@ class RolloutWorker:
         print(f"actions : {self.tiramisu_interface.action_indices}")
         print(f"Speedup : {self.previous_speedup}")
         print(f"Time per stage for {self.current_program} : {self.times_per_stages}")
-        return {
-            "trajectory": trajectory,
-            "speedup": self.previous_speedup,
-            "schedule": str(self.tiramisu_interface.schedule),
-            "log_trajectory": log_trajectory,
-        }
+        return RolloutResult(
+            self.current_program,
+            trajectory,
+            self.previous_speedup,
+            str(self.tiramisu_interface.schedule),
+            log_trajectory,
+        )
 
     def reward_process(self, action, legality, total_speedup):
         switching_branch_penality = 1
@@ -274,3 +275,12 @@ class RolloutWorkerRemote(RolloutWorker):
         worker_id: int = 0,
     ):
         super().__init__(dataset_worker, config, worker_id)
+
+
+@dataclass
+class RolloutResult:
+    function_name: str
+    trajectory: list[Transition]
+    speedup: float
+    schedule: str
+    log_trajectory: str

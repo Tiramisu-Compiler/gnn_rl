@@ -90,6 +90,7 @@ class TiramisuInterface:
     def get_mask(self, mask_size: int = 56):
         mask = np.zeros(mask_size)
 
+        # TODO break out of this order
         for optim in self.schedule.optims_list:
             match type(optim):
                 case tiralib.tiramisu_actions.Skewing:
@@ -126,24 +127,25 @@ class TiramisuInterface:
             mask[ActionSlices.SKEWING] = 1
             mask[ActionSlices.TILING2D] = 1
 
-            # get the leaf iterator of the current branch
-            iterator = self.tree.get_iterator_of_computation(
-                self.current_branch[0][0], self.current_branch[0][1]
-            )
-            # if node has children then mask Unrolling
-            if iterator.child_iterators:
-                mask[ActionSlices.UNROLLING] = 1
+        # check if the most in depth node in the branch is a leaf iterator
+        # if node has children then mask Unrolling
+        iterator = self.tree.iterators[self.current_branch[-1]]
+        if iterator.child_iterators:
+            mask[ActionSlices.UNROLLING] = 1
 
         # mask levels that are not in current branch
         # TODO this is a temporary solution, we need to find a better way handle iterator depth
         levels = [level for level in range(MAX_ITERATOR_DEPTH)]
         for iterator in self.current_branch:
-            if iterator[1] not in levels:
-                print(f"iterator {iterator} not in levels {levels}")
+            # if iterator[1] not in levels:
+            # print(f"iterator {iterator} not in levels {levels}")
             levels.remove(iterator[1])
 
         for level in levels:
+            # REVERSAL has actions that work on a single iterator
             mask[ActionSlices.REVERSAL.start + level] = 1
+            # UNROLLING is always applied to the leaf iterator
+            # the parameter is thus used for factor not level
 
             # only 2 actions for parallelization
             if level < 2:
@@ -164,23 +166,11 @@ class TiramisuInterface:
                 ]
             )
             for tuple_action_start_index in tuple_actions_start_indices:
-                for action_index in self._get_level_action_indices_tuple_actions(
+                for action_index in _get_level_action_indices_tuple_actions(
                     level, tuple_action_start_index
                 ):
                     mask[action_index] = 1
         return mask
-
-    def _get_level_action_indices_tuple_actions(self, level: int, start_index: int):
-        size_of_action = 3 if start_index == ActionSlices.SKEWING.start else 4
-        if level > size_of_action:
-            return []
-
-        if level == 0:
-            return [start_index]
-        if level == size_of_action:
-            return [start_index + level - 1]
-
-        return [start_index + level - 1, start_index + level]
 
     def _tree_to_iterator_vectors(self):
         schedule_tree = self.tree
@@ -552,12 +542,13 @@ def median_execution_time(
 
 
 class ActionSlices:
-    INTERCHANGE = slice(0, 4)
-    REVERSAL = slice(4, 9)
-    SKEWING = slice(9, 12)
-    PARALLELIZATION = slice(12, 14)
-    TILING2D = slice(14, 50)
-    UNROLLING = slice(50, 55)
+    INTERCHANGE = slice(0, 4)  # (0,1), (1,2), (2,3), (3,4)
+    REVERSAL = slice(4, 9)  # 0, 1, 2, 3, 4
+    SKEWING = slice(9, 12)  # (0,1), (1,2), (2,3)
+    PARALLELIZATION = slice(12, 14)  # 0, 1
+    TILING2D = slice(14, 50)  # (0,1), (1,2), (2,3), (3,4) *
+    # [(32, 32), (64, 64), (128, 128), (32, 64), (32, 128), (64, 32), (64, 128), (128, 32), (128, 64)]
+    UNROLLING = slice(50, 55)  # 0, 1, 2, 3, 4
 
     @classmethod
     def all_actions(cls):
@@ -590,6 +581,13 @@ class ActionSlices:
                 return size_dict[start, stop]
 
         raise ValueError(f"Invalid action index {action_index} for tiling2D")
+
+    @classmethod
+    def tuple_actions_start_indices(cls):
+        return [
+            cls.INTERCHANGE.start,
+            cls.SKEWING.start,
+        ] + [i for i in range(cls.TILING2D.start, cls.TILING2D.stop, 4)]
 
 
 # named tuple to hold the return of apply_action result
@@ -639,3 +637,16 @@ class IteratorTags:
     TILE_SIZE_TAG = -3
     SKEWING_FACTOR_1_TAG = -2
     SKEWING_FACTOR_2_TAG = -1
+
+
+def _get_level_action_indices_tuple_actions(level: int, start_index: int):
+    size_of_action = 3 if start_index == ActionSlices.SKEWING.start else 4
+    if level > size_of_action:
+        return []
+
+    if level == 0:
+        return [start_index]
+    if level == size_of_action:
+        return [start_index + level - 1]
+
+    return [start_index + level - 1, start_index + level]

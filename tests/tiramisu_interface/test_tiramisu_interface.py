@@ -3,7 +3,8 @@ from agent.tiramisu_interface import TiramisuInterface
 from config.config import Config
 
 
-def test_cache(dataset_actor):
+@patch("agent.tiramisu_interface.median_execution_time", return_value=1.5)
+def test_cache(_, dataset_actor):
     function_name, cache, cpp = dataset_actor.get_function_by_name(
         "function_cvtcolor_MEDIUM"
     )

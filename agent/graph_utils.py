@@ -2,19 +2,76 @@ import numpy as np
 import re
 
 
-def isl_to_write_matrix(isl_map):
-    comp_iterators_str = re.findall(r"\[(.*)\]\s*->", isl_map)[0]
-    buffer_iterators_str = re.findall(r"->\s*\w*\[(.*)\]", isl_map)[0]
-    buffer_iterators_str = re.sub(r"\w+'\s=", "", buffer_iterators_str)
-    comp_iter_names = re.findall(r"(?:\s*(\w+))+", comp_iterators_str)
-    buf_iter_names = re.findall(r"(?:\s*(\w+))+", buffer_iterators_str)
-    matrix = np.zeros([len(buf_iter_names), len(comp_iter_names) + 1])
-    for i, buf_iter in enumerate(buf_iter_names):
-        for j, comp_iter in enumerate(comp_iter_names):
-            if buf_iter == comp_iter:
-                matrix[i, j] = 1
-                break
-    return matrix
+def parse_isl_map(isl_map: str):
+    # Extract the computation and buffer parts
+    match = re.match(r".*{\s*(\w+)\[([^\]]+)\]\s*->\s*(\w+)\[([^\]]+)\]\s*}", isl_map)
+    if not match:
+        raise ValueError("Invalid ISL map format")
+
+    _ = match.group(1)
+    comp_iterators = match.group(2).split(",")
+    _ = match.group(3)
+    buffer_accesses = match.group(4).split(",")
+
+    # Strip any spaces around iterators or accesses
+    comp_iterators = [it.strip() for it in comp_iterators]
+    buffer_accesses = [access.strip() for access in buffer_accesses]
+
+    return comp_iterators, buffer_accesses
+
+
+def extract_affine_coefficients(access, comp_iterators):
+    """
+    Extract coefficients of iterators in the affine expression.
+    Example: access = 'i1 + 2*j2', comp_iterators = ['i1', 'j2', 'k']
+    Output: [1, 2, 0, 0] (coefficients for i1, j2, k, and scalar term)
+    """
+    # remove all spaces
+    access = access.replace(" ", "")
+
+    # Initialize coefficients (including one for the scalar term)
+    coefficients = [0] * (len(comp_iterators) + 1)
+
+    # Match terms like '2*i1' or 'i1' or '-i1', and extract the coefficients
+    for i, it in enumerate(comp_iterators):
+        # Modify the pattern to match iterator names with numbers or underscores
+        term_pattern = re.compile(r"([+-]?\d*)\s*\*?\s*(" + re.escape(it) + r")(\b|$)")
+        match = term_pattern.search(access)
+        if match:
+            coeff = match.group(1)
+            coefficients[i] = (
+                int(coeff)
+                if coeff and coeff != "+" and coeff != "-"
+                else 1
+                if coeff == "" or coeff == "+"
+                else -1
+            )
+
+    # Handle the scalar part, which is just a constant not attached to any iterator
+    scalar_pattern = re.compile(
+        r"([+-]?\b\d+\b)(?![\*\w])"
+    )  # Match isolated constants (scalars) not tied to iterators
+    scalar_match = scalar_pattern.search(access)
+
+    if scalar_match:
+        coefficients[-1] = int(scalar_match.group(1))
+
+    return coefficients
+
+
+def isl_map_to_write_access_matrix(isl_map: str):
+    # Parse the ISL map
+    comp_iterators, buffer_accesses = parse_isl_map(isl_map)
+
+    # Initialize the access matrix (rows = buffer dimensions, columns = iterators + scalar)
+    access_matrix = []
+
+    # Process each buffer access and extract affine coefficients
+    for access in buffer_accesses:
+        row = extract_affine_coefficients(access, comp_iterators)
+        access_matrix.append(row)
+
+    return np.array(access_matrix).tolist()
 
 
 def pad_access_matrix(access_matrix, max_depth):

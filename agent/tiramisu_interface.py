@@ -3,7 +3,11 @@ import numpy as np
 from ray import logger
 import tiralib.tiramisu as tiralib
 import tiralib.config as tiralib_config
-from agent.graph_utils import encode_data_type, isl_to_write_matrix, pad_access_matrix
+from agent.graph_utils import (
+    encode_data_type,
+    isl_map_to_write_access_matrix,
+    pad_access_matrix,
+)
 from utils.dataset_actor.dataset_actor import TiramisuProgramCache
 
 
@@ -156,15 +160,13 @@ class TiramisuInterface:
             tuple_actions_start_indices = [
                 ActionSlices.INTERCHANGE.start,
                 ActionSlices.SKEWING.start,
+            ] + [
+                i
+                for i in range(
+                    ActionSlices.TILING2D.start, ActionSlices.TILING2D.stop, 4
+                )
             ]
-            tuple_actions_start_indices.extend(
-                [
-                    i
-                    for i in range(
-                        ActionSlices.TILING2D.start, ActionSlices.TILING2D.stop, 4
-                    )
-                ]
-            )
+
             for tuple_action_start_index in tuple_actions_start_indices:
                 for action_index in _get_level_action_indices_tuple_actions(
                     level, tuple_action_start_index
@@ -223,7 +225,7 @@ class TiramisuInterface:
         comps = self.tree.computations
         for comp in comps:
             single_comp_vector = -np.ones(VECTOR_SIZE)
-            # This means that this vector has data related to a computation and not an iterator
+            # vector type 0 for iterators and 1 for computations
             single_comp_vector[0] = 1
 
             comp_dict = self._get_comp_annotations(comp)
@@ -235,7 +237,9 @@ class TiramisuInterface:
             # The write-to buffer id
             single_comp_vector[6] = +comp_dict["write_buffer_id"]
             # We add a vector of write access
-            write_matrix = isl_to_write_matrix(comp_dict["write_access_relation"])
+            write_matrix = isl_map_to_write_access_matrix(
+                comp_dict["write_access_relation"]
+            )
             padded_matrix = pad_access_matrix(write_matrix, max_depth).reshape(-1)
             single_comp_vector[7 : 7 + padded_matrix.shape[0]] = padded_matrix
             # We add vector of read access
@@ -581,13 +585,6 @@ class ActionSlices:
                 return size_dict[start, stop]
 
         raise ValueError(f"Invalid action index {action_index} for tiling2D")
-
-    @classmethod
-    def tuple_actions_start_indices(cls):
-        return [
-            cls.INTERCHANGE.start,
-            cls.SKEWING.start,
-        ] + [i for i in range(cls.TILING2D.start, cls.TILING2D.stop, 4)]
 
 
 # named tuple to hold the return of apply_action result

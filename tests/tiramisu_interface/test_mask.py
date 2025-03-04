@@ -147,7 +147,7 @@ def test_mask_after_skewing_illegal(ti_cvt):
 
 
 @patch("agent.tiramisu_interface.median_execution_time", return_value=1.5)
-def test_mask_after_skewing_legal(median_execution_time, ti_mvt):
+def test_mask_after_skewing_legal(_, ti_mvt):
     result = ti_mvt.apply_action(9)
     assert result.is_legal is True
     mask = ti_mvt.get_mask()
@@ -180,7 +180,7 @@ def test_mask_after_skewing_legal(median_execution_time, ti_mvt):
 
 
 @patch("agent.tiramisu_interface.median_execution_time", return_value=1.5)
-def test_mask_after_parallelisation(median_execution_time, ti_mvt):
+def test_mask_after_parallelisation(_, ti_mvt):
     result = ti_mvt.apply_action(12)
     assert result.is_legal is True
     mask = ti_mvt.get_mask()
@@ -213,7 +213,7 @@ def test_mask_after_parallelisation(median_execution_time, ti_mvt):
 
 
 @patch("agent.tiramisu_interface.median_execution_time", return_value=1.5)
-def test_mask_after_parallelisation_and_tiling(median_execution_time, ti_mvt):
+def test_mask_after_parallelisation_and_tiling(_, ti_mvt):
     result = ti_mvt.apply_action(12)
     assert result.is_legal is True
     result = ti_mvt.apply_action(14)
@@ -247,7 +247,7 @@ def test_mask_after_parallelisation_and_tiling(median_execution_time, ti_mvt):
 
 
 @patch("agent.tiramisu_interface.median_execution_time", return_value=1.5)
-def test_mask_after_unrolling(median_execution_time, ti_mvt):
+def test_mask_after_unrolling(_, ti_mvt):
     result = ti_mvt.apply_action(51)
     assert result.is_legal is True
     mask = ti_mvt.get_mask()
@@ -280,7 +280,7 @@ def test_mask_after_unrolling(median_execution_time, ti_mvt):
 
 
 @patch("agent.tiramisu_interface.median_execution_time", return_value=1.5)
-def test_mask_1_node_branch(median_execution_time, _1_node_branch_ti):
+def test_mask_1_node_branch(_, _1_node_branch_ti):
     ti = _1_node_branch_ti
     ti.apply_action(NEXT_ACTION_INDEX)
     assert len(ti.current_branch) == 1, "Branch is not of length 1"

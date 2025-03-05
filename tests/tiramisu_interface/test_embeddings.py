@@ -7,7 +7,11 @@ from agent.graph_utils import (
     isl_map_to_write_access_matrix,
     pad_access_matrix,
 )
-from agent.tiramisu_interface import VECTOR_SIZE
+from agent.tiramisu_interface import (
+    BUFFER_ACCESS_EMBEDDING_START,
+    MAX_ITERATOR_DEPTH,
+    VECTOR_SIZE,
+)
 
 
 # TYPE_TAG = 0
@@ -67,10 +71,45 @@ def test_encode_data_type():
     assert encode_data_type("whatever") is None
 
 
-def test_pad_access_matrix():
-    access_matrix = np.array([[1, 2], [3, 4]])
-    padded_access_matrix = np.array([[1, 2, -1, -1], [3, 4, -1, -1], [-1, -1, -1, -1]])
-    assert np.array_equal(pad_access_matrix(access_matrix, 2), padded_access_matrix)
+@pytest.mark.parametrize(
+    "access_matrix, padded_access_matrix, max_depth",
+    [
+        (
+            np.array([[1, 2], [3, 4]]),
+            np.array([[1, 2, -1, -1], [3, 4, -1, -1], [-1, -1, -1, -1]]),
+            2,
+        ),
+        (
+            np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]]),
+            np.array(
+                [
+                    [1, 2, 3, -1, -1],
+                    [4, 5, 6, -1, -1],
+                    [7, 8, 9, -1, -1],
+                    [-1, -1, -1, -1, -1],
+                ]
+            ),
+            3,
+        ),
+        (
+            np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]),
+            np.array(
+                [
+                    [1, 0, 0, 0],
+                    [0, 1, 0, 0],
+                    [0, 0, 1, 0],
+                ]
+            ),
+            2,
+        ),
+    ],
+)
+def test_pad_access_matrix(access_matrix, padded_access_matrix, max_depth):
+    access_matrix = np.array(access_matrix)
+    padded_access_matrix = np.array(padded_access_matrix)
+    assert np.array_equal(
+        pad_access_matrix(access_matrix, max_depth), padded_access_matrix
+    )
 
 
 def test_isl_map_to_write_access_matrix():
@@ -98,18 +137,49 @@ def test_isl_map_to_write_access_matrix():
         isl_map_to_write_access_matrix("whatever")
 
 
-# def test_annotations_to_comps_vectors(ti_cvt):
-#     comp_vectors = ti_cvt._annotations_to_comps_vectors()
-#     assert len(comp_vectors) == 1
+def test_annotations_to_comps_vectors(ti_cvt):
+    comp_vectors = ti_cvt._annotations_to_comps_vectors()
+    assert len(comp_vectors) == 1
 
-#     comp02 = -np.ones(VECTOR_SIZE)
-#     comp02[0] = 1
-#     comp02[1] = 1
-#     comp02[2:5] = [1, 0, 0]
-#     comp02[5] = 1
-#     comp02[6] = 2
-#     write_matrix = isl_map_to_write_access_matrix(
-#         ti_cvt._get_comp_annotations("comp02")["write_access_relation"]
-#     )
-#     padded_matrix = pad_access_matrix(write_matrix, MAX_ITERATOR_DEPTH).reshape(-1)
-#     comp02[7 : 7 + MAX_ITERATOR_DEPTH]
+    comp02 = -np.ones(VECTOR_SIZE)
+    comp02[0] = 1
+    comp02[1] = 1
+    comp02[2:5] = [1, 0, 0]
+    comp02[5] = 1
+    comp02[6] = 2
+    write_padded_matrix = pad_access_matrix(
+        np.array([[1, 0, 0, 0], [0, 1, 0, 0]]), MAX_ITERATOR_DEPTH
+    ).reshape(-1)
+    comp02[7:BUFFER_ACCESS_EMBEDDING_START] = write_padded_matrix
+    buf_2 = np.concatenate(
+        [
+            pad_access_matrix(
+                np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]), MAX_ITERATOR_DEPTH
+            ).reshape(-1),
+            [1],
+            [2 + 1],
+        ]
+    )
+    buf_0 = np.concatenate(
+        [
+            pad_access_matrix(
+                np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]), MAX_ITERATOR_DEPTH
+            ).reshape(-1),
+            [0],
+            [0 + 1],
+        ]
+    )
+    buf_1 = np.concatenate(
+        [
+            pad_access_matrix(np.array([[0, 0, 1, 0]]), MAX_ITERATOR_DEPTH).reshape(-1),
+            [0],
+            [1 + 1],
+        ]
+    )
+    access_embedding = np.concatenate([buf_2, buf_0, buf_1])
+    comp02[
+        BUFFER_ACCESS_EMBEDDING_START : BUFFER_ACCESS_EMBEDDING_START
+        + access_embedding.shape[0]
+    ] = access_embedding
+
+    assert np.array_equal(comp_vectors["comp02"], comp02)

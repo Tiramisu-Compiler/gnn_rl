@@ -14,6 +14,9 @@ from utils.dataset_actor.dataset_actor import TiramisuProgramCache
 NEXT_ACTION_INDEX = 55
 SECOND = 1000
 MAX_ITERATOR_DEPTH = 5
+# BUFFER_ACCESS_EMBEDDING_START = (MAX_ITERATOR_DEPTH + 1) * (MAX_ITERATOR_DEPTH +2)
+# + 1 (VECTOR_TYPE) + 3 (DATA_TYPE_ENCODING) + 1 (REDUCTION) + 1 (WRITE_BUFFER_ID)
+BUFFER_ACCESS_EMBEDDING_START = 49
 VECTOR_SIZE = 720
 
 
@@ -255,7 +258,9 @@ class TiramisuInterface:
                 )
                 read_access_size = read_access_matrix.shape[0]
                 single_comp_vector[
-                    49 + index * read_access_size : 49 + (index + 1) * read_access_size
+                    BUFFER_ACCESS_EMBEDDING_START
+                    + index * read_access_size : BUFFER_ACCESS_EMBEDDING_START
+                    + (index + 1) * read_access_size
                 ] = read_access_matrix
             dict_comp[comp] = single_comp_vector
         return dict_comp

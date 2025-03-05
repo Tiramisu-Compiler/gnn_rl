@@ -71,7 +71,7 @@ def isl_map_to_write_access_matrix(isl_map: str):
         row = extract_affine_coefficients(access, comp_iterators)
         access_matrix.append(row)
 
-    return np.array(access_matrix).tolist()
+    return np.array(access_matrix)
 
 
 def pad_access_matrix(access_matrix, max_depth):

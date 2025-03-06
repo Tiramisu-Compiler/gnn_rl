@@ -14,20 +14,6 @@ from agent.tiramisu_interface import (
 )
 
 
-# TYPE_TAG = 0
-# FOCUS_TAG = -11
-# LOWER_BOUND_IS_INT_TAG = -10
-# LOWER_BOUND_VALUE_TAG = -9
-# UPPER_BOUND_IS_INT_TAG = -8
-# UPPER_BOUND_VALUE_TAG = -7
-# PARALLELIZATION_TAG = -6
-# REVERSAL_TAG = -5
-# UNROLLING_FACTOR_TAG = -4
-# TILE_SIZE_TAG = -3
-# SKEWING_FACTOR_1_TAG = -2
-# SKEWING_FACTOR_2_TAG = -1
-
-
 def test_tree_to_iterator_vectors(ti_cvt):
     iterator_vectors = ti_cvt._tree_to_iterator_vectors()
     assert len(iterator_vectors) == 3
@@ -183,3 +169,69 @@ def test_annotations_to_comps_vectors(ti_cvt):
     ] = access_embedding
 
     assert np.array_equal(comp_vectors["comp02"], comp02)
+
+
+def test_graph(ti_cvt):
+    i00 = -np.ones(VECTOR_SIZE)
+    i00[0] = 0
+    i00[-11:] = [1, 1, 0, 1, 322, 0, 0, 0, 0, 0, 0]
+
+    i01 = -np.ones(VECTOR_SIZE)
+    i01[0] = 0
+    i01[-11:] = [1, 1, 0, 1, 130, 0, 0, 0, 0, 0, 0]
+
+    i02 = -np.ones(VECTOR_SIZE)
+    i02[0] = 0
+    i02[-11:] = [1, 1, 0, 1, 5, 0, 0, 0, 0, 0, 0]
+
+    comp02 = -np.ones(VECTOR_SIZE)
+    comp02[0] = 1
+    comp02[1] = 1
+    comp02[2:5] = [1, 0, 0]
+    comp02[5] = 1
+    comp02[6] = 2
+    write_padded_matrix = pad_access_matrix(
+        np.array([[1, 0, 0, 0], [0, 1, 0, 0]]), MAX_ITERATOR_DEPTH
+    ).reshape(-1)
+    comp02[7:BUFFER_ACCESS_EMBEDDING_START] = write_padded_matrix
+    buf_2 = np.concatenate(
+        [
+            pad_access_matrix(
+                np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]), MAX_ITERATOR_DEPTH
+            ).reshape(-1),
+            [1],
+            [2 + 1],
+        ]
+    )
+    buf_0 = np.concatenate(
+        [
+            pad_access_matrix(
+                np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]), MAX_ITERATOR_DEPTH
+            ).reshape(-1),
+            [0],
+            [0 + 1],
+        ]
+    )
+    buf_1 = np.concatenate(
+        [
+            pad_access_matrix(np.array([[0, 0, 1, 0]]), MAX_ITERATOR_DEPTH).reshape(-1),
+            [0],
+            [1 + 1],
+        ]
+    )
+    access_embedding = np.concatenate([buf_2, buf_0, buf_1])
+    comp02[
+        BUFFER_ACCESS_EMBEDDING_START : BUFFER_ACCESS_EMBEDDING_START
+        + access_embedding.shape[0]
+    ] = access_embedding
+
+    node_feats, edge_index, it_index, comp_index = ti_cvt.graph
+    assert len(it_index) == 3
+    assert len(comp_index) == 1
+    assert node_feats.shape[0] == 4
+    assert edge_index.shape[0] == 3
+
+    stacked_node_feats = np.stack([i00, i01, i02, comp02])
+
+    assert np.array_equal(node_feats, stacked_node_feats)
+    assert np.array_equal(edge_index, np.array([[0, 1], [1, 2], [2, 3]]))

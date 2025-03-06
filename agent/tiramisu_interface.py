@@ -272,8 +272,6 @@ class TiramisuInterface:
         it_index = {}
         comp_index = {}
         tree = self.tree
-        if not tree:
-            raise ValueError("Tree is not initialized")
         num_iterators = len(tree.iterators)
         for i, iterator_id in enumerate(it_vector_dict):
             it_index[iterator_id] = i
@@ -303,53 +301,6 @@ class TiramisuInterface:
         for iterator in self.current_branch:
             index = it_index[iterator]
             node_feats[index][IteratorTags.FOCUS_TAG] = 1
-
-        ## Removed because we are using the ISL tree to update the graph
-        ## and we do not pass any information of the applied transformations to the model.
-        # apply previous actions of the schedule
-        # for optim in self.schedule.optims_list:
-        #     match type(optim):
-        #         case tiralib.tiramisu_actions.Interchange:
-        #             iterator_1 = tree.get_iterator_of_computation(*optim.params[0])
-        #             iterator_2 = tree.get_iterator_of_computation(*optim.params[1])
-        #             it1 = it_index[iterator_1.name]
-        #             it2 = it_index[iterator_2.name]
-        #             for edge in edge_index:
-        #                 if edge[0] == it1:
-        #                     edge[0] = it2
-        #                 elif edge[0] == it2:
-        #                     edge[0] = it1
-        #                 if edge[1] == it1:
-        #                     edge[1] = it2
-        #                 elif edge[1] == it2:
-        #                     edge[1] = it1
-        #         case tiralib.tiramisu_actions.Reversal:
-        #             iterator = tree.get_iterator_of_computation(*optim.iterator_id)
-        #             index = it_index[iterator.name]
-        #             node_feats[index][-5] = 1
-        #         case tiralib.tiramisu_actions.Skewing:
-        #             for iterator_id in optim.iterators:
-        #                 iterator = tree.get_iterator_of_computation(*iterator_id)
-        #                 index = it_index[iterator.name]
-        #                 node_feats[index][-2:] = optim.factors
-        #         case tiralib.tiramisu_actions.Parallelization:
-        #             iterator = tree.get_iterator_of_computation(*optim.iterator_id)
-        #             index = it_index[iterator.name]
-        #             node_feats[index][-6] = 1
-        #         case tiralib.tiramisu_actions.Tiling2D:
-        #             for iterator_id, tile_size in zip(
-        #                 optim.iterators, optim.tile_sizes
-        #             ):
-        #                 iterator = tree.get_iterator_of_computation(*iterator_id)
-        #                 index = it_index[iterator.name]
-        #                 node_feats[index][-3] = tile_size
-        #         case tiralib.tiramisu_actions.Unrolling:
-        #             assert isinstance(optim, tiralib.tiramisu_actions.Unrolling)
-        #             iterator = tree.get_iterator_of_computation(*optim.iterator_id)
-        #             index = it_index[iterator.name]
-        #             node_feats[index][-4] = optim.unrolling_factor
-        #         case _:
-        #             raise ValueError(f"Unsupported action {optim}")
 
         return node_feats, np.array(edge_index), it_index, comp_index
 
@@ -423,7 +374,9 @@ class TiramisuInterface:
             < ActionSlices.INTERCHANGE.stop
         ):
             level = action_index - ActionSlices.INTERCHANGE.start
-            if level not in [iterator[1] for iterator in self.current_branch]:
+            # check if level is in current branch we exclude the last iterator because the action uses
+            # 2 successive iterators
+            if level not in [iterator[1] for iterator in self.current_branch[:-1]]:
                 raise ValueError(
                     f"Invalid level {level} for interchange: current branch {self.current_branch} and level {level}"
                 )
@@ -439,7 +392,8 @@ class TiramisuInterface:
             return tiralib.tiramisu_actions.Reversal(params=[(computation, level)])
         elif ActionSlices.SKEWING.start <= action_index < ActionSlices.SKEWING.stop:
             level = action_index - ActionSlices.SKEWING.start
-            if level not in [iterator[1] for iterator in self.current_branch]:
+            # action uses 2 successive iterators
+            if level not in [iterator[1] for iterator in self.current_branch[:-1]]:
                 raise ValueError(
                     f"Invalid level {level} for skewing: current branch {self.current_branch} and level {level}"
                 )
@@ -461,7 +415,7 @@ class TiramisuInterface:
             )
         elif ActionSlices.TILING2D.start <= action_index < ActionSlices.TILING2D.stop:
             level = (action_index - ActionSlices.TILING2D.start) % 4
-            if level not in [iterator[1] for iterator in self.current_branch]:
+            if level not in [iterator[1] for iterator in self.current_branch[:-1]]:
                 raise ValueError(
                     f"Invalid level {level} for tiling2D: current branch {self.current_branch} and level {level}"
                 )
@@ -557,20 +511,7 @@ class ActionSlices:
     PARALLELIZATION = slice(12, 14)  # 0, 1
     TILING2D = slice(14, 50)  # (0,1), (1,2), (2,3), (3,4) *
     # [(32, 32), (64, 64), (128, 128), (32, 64), (32, 128), (64, 32), (64, 128), (128, 32), (128, 64)]
-    UNROLLING = slice(50, 55)  # 0, 1, 2, 3, 4
-
-    @classmethod
-    def all_actions(cls):
-        return (
-            [
-                cls.INTERCHANGE,
-                cls.REVERSAL,
-                cls.SKEWING,
-                cls.PARALLELIZATION,
-            ]
-            + [slice(i, i + 4) for i in range(cls.TILING2D.start, cls.TILING2D.stop, 4)]
-            + [cls.UNROLLING]
-        )
+    UNROLLING = slice(50, 55)  # 1, 2, 4, 8, 16
 
     @classmethod
     def tiling_size(cls, action_index: int):

@@ -74,8 +74,8 @@ class RolloutWorker:
     def reset(self, function_name: str = None):
         self.times_per_stages = TimePerStage()
         start_time = time()
-        model_compatible_program = False
-        while not model_compatible_program:
+        is_program_model_compatible = False
+        while not is_program_model_compatible:
             logger.info("Getting next function")
             if function_name:
                 function_name, function_data, cpp_code = (
@@ -87,7 +87,7 @@ class RolloutWorker:
                 )
 
             annotations = function_data.program_annotation
-            model_compatible_program = program_compatible_with_model(annotations)
+            is_program_model_compatible = program_compatible_with_model(annotations)
         end_time = time()
         self.times_per_stages.get_next_function = end_time - start_time
         start_time = end_time

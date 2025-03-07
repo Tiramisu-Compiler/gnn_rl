@@ -5,6 +5,7 @@ from agent.tiramisu_interface import (
     ActionSlices,
     _get_level_action_indices_tuple_actions,
 )
+from tiralib.tiramisu import Schedule
 
 
 @pytest.mark.parametrize(
@@ -311,3 +312,13 @@ def test_mask_1_node_branch(_, _1_node_branch_ti):
         mask[ActionSlices.UNROLLING] == unrolling_part
     ).all(), "Unrolling mask is wrong"
     assert (mask[55] == next_action).all(), "Next action mask is wrong"
+
+
+@patch("agent.tiramisu_interface.median_execution_time", return_value=1.5)
+def test_mask_unsupported_action(_, ti_cvt):
+    ti = ti_cvt
+    ti.schedule = Schedule.from_sched_str(
+        "T3(L0,L1,L2,32,32,32,comps=['comp02'])", ti.tiramisu_program
+    )
+    with pytest.raises(ValueError):
+        ti.apply_action(50)

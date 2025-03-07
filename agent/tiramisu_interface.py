@@ -122,6 +122,8 @@ class TiramisuInterface:
                 case tiralib.tiramisu_actions.Unrolling:
                     # Mask all actions
                     mask[0:55] = 1
+                case _:
+                    raise ValueError(f"Unsupported action type {type(optim)}")
 
         # hide all previous actions
         for action_index in self.action_indices:
@@ -307,7 +309,7 @@ class TiramisuInterface:
     def apply_action(self, action: int):
         done = False
         mask = self.get_mask()
-        if np.all(mask == 1):
+        if np.all(mask):
             logger.warning("All actions are masked")
             return ApplyActionResult(is_legal=True, speedup=1, done=True, crashed=False)
         self.action_indices.append(action)

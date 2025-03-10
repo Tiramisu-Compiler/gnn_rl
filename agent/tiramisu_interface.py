@@ -8,7 +8,7 @@ from agent.graph_utils import (
     isl_map_to_write_access_matrix,
     pad_access_matrix,
 )
-from utils.dataset_actor.dataset_actor import TiramisuProgramCache
+from utils.dataset_actor import TiramisuProgramCache
 
 
 NEXT_ACTION_INDEX = 55
@@ -122,6 +122,12 @@ class TiramisuInterface:
                 case tiralib.tiramisu_actions.Unrolling:
                     # Mask all actions
                     mask[0:55] = 1
+                case (
+                    tiralib.tiramisu_actions.Interchange
+                    | tiralib.tiramisu_actions.Reversal
+                ):
+                    # No masks
+                    pass
                 case _:
                     raise ValueError(f"Unsupported action type {type(optim)}")
 

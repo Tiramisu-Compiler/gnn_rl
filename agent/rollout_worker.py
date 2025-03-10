@@ -14,7 +14,7 @@ from torch_geometric.data import Data
 
 from agent.tiramisu_interface import TiramisuInterface, program_compatible_with_model
 from config.config import AutoSchedulerConfig, Config
-from utils.dataset_actor.dataset_actor import DatasetActor
+from utils.dataset_actor import DatasetActor
 
 logger = logging.getLogger(__name__)
 

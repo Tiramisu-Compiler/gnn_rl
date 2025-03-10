@@ -1,7 +1,7 @@
 from pytest import fixture
 from agent.tiramisu_interface import TiramisuInterface
 from config.config import Config
-from utils.dataset_actor.dataset_actor import DatasetActor
+from utils.dataset_actor import DatasetActor
 
 
 @fixture

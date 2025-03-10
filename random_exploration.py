@@ -8,7 +8,7 @@ import ray
 import torch
 from config.config import Config
 from agent.rollout_worker import RolloutWorker
-from utils.dataset_actor.dataset_actor import DatasetActor
+from utils.dataset_actor import DatasetActor
 
 
 class RandomAgent(nn.Module):

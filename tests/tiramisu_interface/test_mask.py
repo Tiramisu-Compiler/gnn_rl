@@ -248,7 +248,10 @@ def test_mask_after_parallelisation_and_tiling(_, ti_mvt):
 
 
 @patch("agent.tiramisu_interface.median_execution_time", return_value=1.5)
-def test_mask_after_unrolling(_, ti_mvt):
+@patch(
+    "agent.tiramisu_interface.TiramisuInterface.schedule_is_legal", return_value=True
+)
+def test_mask_after_unrolling(_, schedule_is_legal, ti_mvt):
     result = ti_mvt.apply_action(51)
     assert result.is_legal is True
     mask = ti_mvt.get_mask()
@@ -315,10 +318,47 @@ def test_mask_1_node_branch(_, _1_node_branch_ti):
 
 
 @patch("agent.tiramisu_interface.median_execution_time", return_value=1.5)
-def test_mask_unsupported_action(_, ti_cvt):
+@patch("tiralib.tiramisu.schedule.Schedule.update_tree_from_isl_ast")
+def test_mask_unsupported_action(_, update, ti_cvt):
     ti = ti_cvt
     ti.schedule = Schedule.from_sched_str(
         "T3(L0,L1,L2,32,32,32,comps=['comp02'])", ti.tiramisu_program
     )
     with pytest.raises(ValueError):
         ti.apply_action(50)
+
+
+@patch("agent.tiramisu_interface.median_execution_time", return_value=1.5)
+@patch(
+    "agent.tiramisu_interface.TiramisuInterface.schedule_is_legal", return_value=True
+)
+def test_mask_after_interchange(_, schedule_is_legal, ti_cvt):
+    result = ti_cvt.apply_action(0)
+    assert result.is_legal is True
+    mask = ti_cvt.get_mask()
+
+    interchange_part = [1, 0, 1, 1]
+    reversal_part = [0, 0, 0, 1, 1]
+    skewing_part = [0, 0, 1]
+    parallelize_part = [0, 0]
+    tiling2d_part = [0, 0, 1, 1] * 9
+    unrolling_part = [0, 0, 0, 0, 0]
+    next_action = [0]
+
+    assert (
+        mask[ActionSlices.INTERCHANGE] == interchange_part
+    ).all(), "Interchange mask is wrong"
+    assert (
+        mask[ActionSlices.REVERSAL] == reversal_part
+    ).all(), "Reversal mask is wrong"
+    assert (mask[ActionSlices.SKEWING] == skewing_part).all(), "Skewing mask is wrong"
+    assert (
+        mask[ActionSlices.PARALLELIZATION] == parallelize_part
+    ).all(), "Parallelize mask is wrong"
+    assert (
+        mask[ActionSlices.TILING2D] == tiling2d_part
+    ).all(), "Tiling2D mask is wrong"
+    assert (
+        mask[ActionSlices.UNROLLING] == unrolling_part
+    ).all(), "Unrolling mask is wrong"
+    assert (mask[55] == next_action).all(), "Next action mask is wrong"

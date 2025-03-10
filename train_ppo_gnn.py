@@ -5,7 +5,7 @@ import torch.nn as nn
 from agent.policy_value_nn import GAT
 from agent.rollout_worker import RolloutWorkerRemote, Transition
 from config.config import Config
-from utils.dataset_actor.dataset_actor import DatasetActorRemote
+from utils.dataset_actor import DatasetActorRemote
 import numpy as np
 import ray
 import math

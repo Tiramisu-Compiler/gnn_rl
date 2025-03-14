@@ -108,7 +108,6 @@ class RolloutWorker:
         self.previous_speedup = 1
         self.steps = 0
         self.state = (node_feats, edge_index, it_index)
-        self.previous_action = None
         self.times_per_stages.graph = time() - start_time
 
     def rollout(self, model: nn.Module, device: str):
@@ -248,7 +247,6 @@ class RolloutWorker:
         if legality:
             if action != 55:
                 # If the action is not Next
-                self.previous_action = action
                 instant_speedup = total_speedup / self.previous_speedup
                 self.previous_speedup = total_speedup
             else:
@@ -259,7 +257,7 @@ class RolloutWorker:
         instant_speedup = np.clip(instant_speedup, 0, max_speedup)
 
         reward = math.log(instant_speedup, log_base)
-        logger.info(
+        print(
             f"Reward : {reward}, Total Speedup : {total_speedup}, instant_speedup : {instant_speedup}"
         )
 
@@ -274,7 +272,7 @@ class RolloutWorkerRemote(RolloutWorker):
         config: AutoSchedulerConfig,
         worker_id: int = 0,
     ):
-        super().__init__(dataset_worker, config, worker_id)
+        super().__init__(dataset_worker, config, worker_id)  # pragma: no cover
 
 
 @dataclass

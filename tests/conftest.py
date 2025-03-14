@@ -1,4 +1,5 @@
 from pytest import fixture
+from agent.policy_value_nn import GAT
 from agent.tiramisu_interface import TiramisuInterface
 from config.config import Config
 from utils.dataset_actor import DatasetActor
@@ -59,3 +60,8 @@ def _1_node_branch_ti(test_dataset_actor):
         cache=cache,
         machine=Config.config.machine,
     )
+
+
+@fixture
+def gnn_model():
+    return GAT(input_size=720, num_heads=4, hidden_size=128, num_outputs=56).to("cpu")

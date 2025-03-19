@@ -1,4 +1,6 @@
 from unittest.mock import patch
+
+import pytest
 from agent.tiramisu_interface import TiramisuInterface
 from config.config import Config
 
@@ -108,3 +110,47 @@ def test_branches(ti_cvt, dataset_actor):
     )
     assert len(ti.branches) == 1
     assert ti.current_branch_index == 0
+
+
+def test_init_with_cache_no_server(dataset_actor):
+    function_name, cache, cpp = dataset_actor.get_function_by_name(
+        "function_cvtcolor_MEDIUM"
+    )
+    assert function_name == "function_cvtcolor_MEDIUM"
+
+    ti = TiramisuInterface(
+        cpp,
+        tiralib_config_path=Config.config.tiralib_config_path,
+        machine=Config.config.machine,
+        cache=cache,
+        use_server=False,
+    )
+    assert ti.tiramisu_program.name == "function_cvtcolor_MEDIUM"
+    assert ti.cache is not None
+    assert ti.tiramisu_program.server is None
+    assert ti.machine == Config.config.machine
+    assert ti._initial_execution_time is None
+    assert ti.cache.execution_time(Config.config.machine, "empty") is None
+    with patch(
+        "tiralib.tiramisu.schedule.Schedule.execute", return_value=[3.0, 2.0, 5.0]
+    ) as mock_execute:
+        assert ti.initial_execution_time == 3.0
+        mock_execute.assert_called_once()
+        assert ti.initial_execution_time == 3.0
+        mock_execute.assert_called_once()
+        assert ti.tiramisu_program.server is None
+
+
+def test_init_no_cache_no_server(dataset_actor):
+    function_name, cache, cpp = dataset_actor.get_function_by_name(
+        "function_cvtcolor_MEDIUM"
+    )
+    assert function_name == "function_cvtcolor_MEDIUM"
+
+    with pytest.raises(ValueError):
+        TiramisuInterface(
+            cpp,
+            tiralib_config_path=Config.config.tiralib_config_path,
+            machine=Config.config.machine,
+            use_server=False,
+        )

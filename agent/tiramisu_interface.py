@@ -27,6 +27,7 @@ class TiramisuInterface:
         tiralib_config_path: str,
         cache: TiramisuProgramCache | None = None,
         machine: str = "jubail",
+        use_server: bool = True,
     ):
         tiralib_config.BaseConfig.init(tiralib_config_path)
         self.current_branch_index = 0
@@ -34,11 +35,14 @@ class TiramisuInterface:
         self._initial_execution_time: float | None = None
         self.cache = cache
         self.machine = machine
+        self.use_server = use_server
         if self.cache:
             self.tiramisu_program = tiralib.TiramisuProgram.from_annotations(
                 self.cache.program_annotation, cpp_code=cpp_code, load_tree=True
             )
         else:
+            if not self.use_server:
+                raise ValueError("Server must be used when cache is not provided")
             self.tiramisu_program = tiralib.TiramisuProgram.init_server(
                 cpp_code=cpp_code,
                 load_isl_ast=True,
@@ -67,7 +71,7 @@ class TiramisuInterface:
                     self.machine, "empty"
                 )
             if not self._initial_execution_time:
-                _ = self.server
+                self.init_server()
                 self._initial_execution_time = median_execution_time(self.schedule)
                 if self.cache:
                     self.cache.add_execution_time(
@@ -93,6 +97,10 @@ class TiramisuInterface:
     @property
     def tree(self):
         return self.schedule.tree
+
+    def init_server(self):
+        if self.use_server:
+            _ = self.server
 
     def get_mask(self, mask_size: int = 56):
         mask = np.zeros(mask_size)
@@ -351,7 +359,7 @@ class TiramisuInterface:
             ):
                 current_execution_time = cached_exec_time
             else:
-                _ = self.server
+                self.init_server()
                 current_execution_time = median_execution_time(tmp_schedule)
                 if self.cache:
                     self.cache.add_execution_time(
@@ -468,19 +476,41 @@ class TiramisuInterface:
             skewing_factors = self.cache.schedules_solver.get(schedule_str, None)
 
         if is_legal is None:
-            result = self.server.run("legality", schedule)
-            is_legal: bool = result.legality
-            isl_ast_str: str = result.isl_ast
-            skewing_factors = None
-            if result.additional_info and "skewing_factors" in result.additional_info:
-                skewing_factors = [
-                    int(factor)
-                    for factor in result.additional_info.replace(
-                        "skewing_factors:", ""
-                    ).split(",")
-                ]
-            if self.cache:
-                self.cache.add(schedule_str, is_legal, isl_ast_str, skewing_factors)
+            if self.use_server:
+                result = self.server.run("legality", schedule)
+                is_legal: bool = result.legality
+                isl_ast_str: str = result.isl_ast
+                skewing_factors = None
+                if (
+                    result.additional_info
+                    and "skewing_factors" in result.additional_info
+                ):
+                    skewing_factors = [
+                        int(factor)
+                        for factor in result.additional_info.replace(
+                            "skewing_factors:", ""
+                        ).split(",")
+                    ]
+                if self.cache:
+                    self.cache.add(schedule_str, is_legal, isl_ast_str, skewing_factors)
+            else:
+                is_legal = schedule.is_legal(with_ast=True)
+                isl_ast_str = schedule.tree.get_isl_ast_string()
+                if (
+                    schedule.optims_list[-1].is_skewing()
+                    and schedule.optims_list[-1].params[2] == 0
+                ):
+                    skewing_action: tiralib.tiramisu_actions.Skewing = (
+                        schedule.optims_list[-1]
+                    )
+                    copy_schedule = schedule.copy()
+                    copy_schedule.optims_list.pop()
+                    result = tiralib.tiramisu_actions.Skewing.get_factors(
+                        copy_schedule,
+                        [iterator[1] for iterator in skewing_action.iterators],
+                        skewing_action.comps,
+                    )
+                    skewing_factors = list(result) if result else None
 
         schedule.legality = is_legal
         schedule.tree = tiralib.tiramisu_tree.TiramisuTree.from_isl_ast_string_list(

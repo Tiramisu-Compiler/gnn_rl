@@ -39,7 +39,7 @@ class TimePerStage:
     update_dataset: float = 0.0
 
     def __repr__(self):
-        return json.dumps(self.__dict__, indent=4)
+        return json.dumps(self.__dict__, indent=4)  # pragma: no cover
 
     def __str__(self):
         return json.dumps(self.__dict__)
@@ -205,19 +205,18 @@ class RolloutWorker:
         else:
             start_time = time()
             self.times_per_stages.rollout = start_time - rollout_start_time
-            if self.tiramisu_interface.cache:
-                if type(self.dataset_worker) is DatasetActor:
-                    self.dataset_worker.update_dataset(
-                        self.current_program, self.tiramisu_interface.cache.to_dict()
+            if type(self.dataset_worker) is DatasetActor:
+                self.dataset_worker.update_dataset(
+                    self.current_program, self.tiramisu_interface.cache.to_dict()
+                )
+            else:
+                ray.get(  # pragma: no cover
+                    self.dataset_worker.update_dataset.remote(
+                        self.current_program,
+                        self.tiramisu_interface.cache.to_dict(),
                     )
-                else:
-                    ray.get(
-                        self.dataset_worker.update_dataset.remote(
-                            self.current_program,
-                            self.tiramisu_interface.cache.to_dict(),
-                        )
-                    )
-                self.times_per_stages.update_dataset = time() - start_time
+                )
+            self.times_per_stages.update_dataset = time() - start_time
 
         # clean up created files
         # delete files with the filename in workspace

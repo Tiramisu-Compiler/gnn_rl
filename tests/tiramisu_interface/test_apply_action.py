@@ -284,3 +284,40 @@ def test_schedule_is_legal_no_server(isl_ast, dataset_actor):
         run.assert_not_called()
         skewing_solver.assert_called_once()
         assert ti.schedule.optims_list[0].factors == [1, 1]
+
+
+@patch("tiralib.tiramisu.tiramisu_tree.TiramisuTree.from_isl_ast_string_list")
+def test_schedule_is_legal_no_server_skewing_set_by_user(isl_ast, dataset_actor):
+    function_name, cache, cpp = dataset_actor.get_function_by_name(
+        "function_mvt_MEDIUM"
+    )
+    ti = TiramisuInterface(
+        cpp,
+        tiralib_config_path=Config.config.tiralib_config_path,
+        cache=cache,
+        machine=Config.config.machine,
+        use_server=False,
+    )
+    ti.cache = MagicMock()
+    ti.cache.schedules_legality = {
+        "S(L0,L1,1,1,comps=['comp03', 'comp04'])": None,
+    }
+    ti.schedule = Schedule.from_sched_str(
+        "S(L0,L1,2,2,comps=['comp03', 'comp04'])", ti.tiramisu_program
+    )
+    with (
+        patch(
+            "tiralib.tiramisu.function_server.FunctionServer.run",
+        ) as run,
+        patch(
+            "tiralib.tiramisu.compiling_service.CompilingService.compile_legality",
+            return_value=(True, MagicMock()),
+        ),
+        patch(
+            "tiralib.tiramisu.compiling_service.CompilingService.call_skewing_solver",
+        ) as skewing_solver,
+    ):
+        assert ti.schedule_is_legal(ti.schedule)
+        run.assert_not_called()
+        skewing_solver.assert_not_called()
+        assert ti.schedule.optims_list[0].factors == [2, 2]

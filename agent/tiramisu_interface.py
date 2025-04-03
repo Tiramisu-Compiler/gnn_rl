@@ -52,6 +52,7 @@ class TiramisuInterface:
             )
 
         self.schedule = tiralib.Schedule(self.tiramisu_program)
+        assert self.initial_execution_time, "Getting initial execution time failed"
 
         # self.branches = self.schedule_branches
 
@@ -360,7 +361,12 @@ class TiramisuInterface:
                 current_execution_time = cached_exec_time
             else:
                 self.init_server()
-                current_execution_time = median_execution_time(tmp_schedule)
+                try:
+                    current_execution_time = median_execution_time(tmp_schedule)
+                except tiralib.function_server.ServerExecutionFailedError:
+                    return ApplyActionResult(
+                        is_legal=False, speedup=1, done=False, crashed=True
+                    )
                 if self.cache:
                     self.cache.add_execution_time(
                         self.machine, tmp_schedule_str, current_execution_time

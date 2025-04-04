@@ -450,7 +450,7 @@ class TiramisuInterface:
             )
 
         elif ActionSlices.UNROLLING.start <= action_index < ActionSlices.UNROLLING.stop:
-            factor = action_index - ActionSlices.UNROLLING.start
+            factor = action_index - ActionSlices.UNROLLING.start + 1
             # check if leaf of current branch does not have child iterators
             iterator_id = self.current_branch[-1]
             iterator = self.tree.get_iterator_of_computation(*iterator_id)
@@ -555,7 +555,7 @@ class ActionSlices:
     PARALLELIZATION = slice(12, 14)  # 0, 1
     TILING2D = slice(14, 50)  # (0,1), (1,2), (2,3), (3,4) *
     # [(32, 32), (64, 64), (128, 128), (32, 64), (32, 128), (64, 32), (64, 128), (128, 32), (128, 64)]
-    UNROLLING = slice(50, 55)  # 1, 2, 4, 8, 16
+    UNROLLING = slice(50, 55)  # 2, 4, 8, 16, 32
 
     @classmethod
     def tiling_size(cls, action_index: int):

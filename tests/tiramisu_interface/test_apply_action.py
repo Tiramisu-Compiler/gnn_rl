@@ -14,7 +14,7 @@ def tilings_2d():
             [
                 (
                     i + j,
-                    f"T2(L{j},L{j+1},{ActionSlices.tiling_size(i)[0]},{ActionSlices.tiling_size(i)[1]},comps=['comp02'])",
+                    f"T2(L{j},L{j + 1},{ActionSlices.tiling_size(i)[0]},{ActionSlices.tiling_size(i)[1]},comps=['comp02'])",
                 )
                 if j < 2
                 else (i + j, "raise")
@@ -45,15 +45,26 @@ def tilings_2d():
     ]
     + tilings_2d()
     + [
-        (50, "U(L2,1,comps=['comp02'])"),
-        (51, "U(L2,2,comps=['comp02'])"),
-        (52, "U(L2,4,comps=['comp02'])"),
-        (53, "U(L2,8,comps=['comp02'])"),
-        (54, "U(L2,16,comps=['comp02'])"),
+        (50, "U(L2,2,comps=['comp02'])"),
+        (51, "U(L2,4,comps=['comp02'])"),
+        (52, "U(L2,8,comps=['comp02'])"),
+        (53, "U(L2,16,comps=['comp02'])"),
+        (54, "U(L2,32,comps=['comp02'])"),
         (55, "raise"),
     ],
 )
-def test_action_index_to_tiralib_action(ti_cvt, action, expected_action_str):
+@patch("tiralib.tiramisu.schedule.Schedule.execute", return_value=[3.0, 2.0, 5.0])
+def test_action_index_to_tiralib_action(
+    mock_execute, dataset_actor, action, expected_action_str
+):
+    _, cache, cpp = dataset_actor.get_function_by_name("function_cvtcolor_MEDIUM")
+    ti_cvt = TiramisuInterface(
+        cpp,
+        tiralib_config_path=Config.config.tiralib_config_path,
+        cache=cache,
+        machine=Config.config.machine,
+    )
+
     if expected_action_str == "raise":
         with pytest.raises(ValueError):
             action_obj = ti_cvt.action_index_to_tiralib_action(action)
@@ -249,7 +260,8 @@ def test_schedule_is_legal_skewing_factors_set_by_user(run, isl_ast, ti_cvt):
 
 
 @patch("tiralib.tiramisu.tiramisu_tree.TiramisuTree.from_isl_ast_string_list")
-def test_schedule_is_legal_no_server(isl_ast, dataset_actor):
+@patch("tiralib.tiramisu.schedule.Schedule.execute", return_value=[2.0])
+def test_schedule_is_legal_no_server(_, isl_ast, dataset_actor):
     function_name, cache, cpp = dataset_actor.get_function_by_name(
         "function_mvt_MEDIUM"
     )
@@ -287,7 +299,8 @@ def test_schedule_is_legal_no_server(isl_ast, dataset_actor):
 
 
 @patch("tiralib.tiramisu.tiramisu_tree.TiramisuTree.from_isl_ast_string_list")
-def test_schedule_is_legal_no_server_skewing_set_by_user(isl_ast, dataset_actor):
+@patch("tiralib.tiramisu.schedule.Schedule.execute", return_value=[2.0])
+def test_schedule_is_legal_no_server_skewing_set_by_user(_, isl_ast, dataset_actor):
     function_name, cache, cpp = dataset_actor.get_function_by_name(
         "function_mvt_MEDIUM"
     )

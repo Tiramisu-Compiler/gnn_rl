@@ -19,7 +19,8 @@ def test_init(reset, dataset_actor):
     reset.assert_called_once()
 
 
-def test_init_with_reset(dataset_actor):
+@patch("tiralib.tiramisu.schedule.Schedule.execute", return_value=[3.0, 2.0, 5.0])
+def test_init_with_reset(_, dataset_actor):
     worker = RolloutWorker(
         dataset_worker=dataset_actor,
         config=Config.config,
@@ -32,7 +33,8 @@ def test_init_with_reset(dataset_actor):
 
 
 @patch("ray.get", lambda x: x)
-def test_init_with_reset_remote_dataset_actor(dataset_actor):
+@patch("tiralib.tiramisu.schedule.Schedule.execute")
+def test_init_with_reset_remote_dataset_actor(_, dataset_actor):
     remote_dataset_actor = MagicMock()
     remote_dataset_actor.get_next_function.remote.return_value = (
         dataset_actor.get_function_by_name("function_cvtcolor_MEDIUM")
@@ -48,7 +50,8 @@ def test_init_with_reset_remote_dataset_actor(dataset_actor):
     assert worker.state
 
 
-def test_reward_process(dataset_actor):
+@patch("tiralib.tiramisu.schedule.Schedule.execute")
+def test_reward_process(_, dataset_actor):
     worker = RolloutWorker(
         dataset_worker=dataset_actor,
         config=Config.config,
@@ -65,7 +68,8 @@ def test_reward_process(dataset_actor):
     assert worker.previous_speedup == 2
 
 
-def test_rollout_with_model(gnn_model, dataset_actor):
+@patch("tiralib.tiramisu.schedule.Schedule.execute", return_value=[2.0])
+def test_rollout_with_model(_, gnn_model, dataset_actor):
     worker = RolloutWorker(
         dataset_worker=dataset_actor,
         config=Config.config,
@@ -138,7 +142,8 @@ def test_rollout_action_stopped_at_40(apply_action, dataset_actor):
 
 
 @patch("pathlib.Path.unlink")
-def test_rollout_with_model_clean_files(unlink, gnn_model, dataset_actor):
+@patch("tiralib.tiramisu.schedule.Schedule.execute", return_value=[2.0])
+def test_rollout_with_model_clean_files(_, unlink, gnn_model, dataset_actor):
     Config.config.clean_files = True
     worker = RolloutWorker(
         dataset_worker=dataset_actor,

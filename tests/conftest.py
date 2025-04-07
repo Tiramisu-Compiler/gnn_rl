@@ -1,3 +1,4 @@
+from unittest.mock import patch
 from pytest import fixture
 from agent.policy_value_nn import GAT
 from agent.tiramisu_interface import TiramisuInterface
@@ -16,7 +17,8 @@ def dataset_actor(conf_init):
 
 
 @fixture
-def ti_cvt(dataset_actor):
+@patch("tiralib.tiramisu.schedule.Schedule.execute", return_value=[2.0])
+def ti_cvt(_, dataset_actor):
     function_name, cache, cpp = dataset_actor.get_function_by_name(
         "function_cvtcolor_MEDIUM"
     )
@@ -29,7 +31,8 @@ def ti_cvt(dataset_actor):
 
 
 @fixture
-def ti_mvt(dataset_actor):
+@patch("tiralib.tiramisu.schedule.Schedule.execute", return_value=[2.0])
+def ti_mvt(_, dataset_actor):
     function_name, cache, cpp = dataset_actor.get_function_by_name(
         "function_mvt_MEDIUM"
     )
@@ -50,7 +53,8 @@ def test_dataset_actor(conf_init):
 
 
 @fixture
-def _1_node_branch_ti(test_dataset_actor):
+@patch("tiralib.tiramisu.schedule.Schedule.execute", return_value=[2.0])
+def _1_node_branch_ti(_, test_dataset_actor):
     function_name, cache, cpp = test_dataset_actor.get_function_by_name(
         "function014733"
     )

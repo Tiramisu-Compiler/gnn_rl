@@ -71,11 +71,13 @@ class RolloutWorker:
         # Initializing values and the episode
         self.reset(function_name)
 
-    def reset(self, function_name: str = None):
+    def reset(self, function_name: str | None = None):
+        assert Config.config is not None, "Config is not initialized"
         self.times_per_stages = TimePerStage()
         start_time = time()
         is_program_model_compatible = False
-        while not is_program_model_compatible:
+        init_crashed = False
+        while not is_program_model_compatible or init_crashed:
             logger.info("Getting next function")
             if function_name:
                 function_name, function_data, cpp_code = (
@@ -88,17 +90,25 @@ class RolloutWorker:
 
             annotations = function_data.program_annotation
             is_program_model_compatible = program_compatible_with_model(annotations)
-        end_time = time()
-        self.times_per_stages.get_next_function = end_time - start_time
-        start_time = end_time
+            end_time = time()
+            self.times_per_stages.get_next_function = end_time - start_time
+            start_time = end_time
 
-        self.current_program = function_name
-        self.tiramisu_interface = TiramisuInterface(
-            cpp_code,
-            self.tiralib_config_path,
-            cache=function_data,
-            machine=Config.config.machine,
-        )
+            self.current_program = function_name
+            try:
+                print(f"Compiling Function : {function_name}")
+                self.tiramisu_interface = TiramisuInterface(
+                    cpp_code,
+                    self.tiralib_config_path,
+                    cache=function_data,
+                    machine=Config.config.machine,
+                )
+            except Exception as e:
+                init_crashed = True
+                logger.error(
+                    f"Error while creating TiramisuInterface for function {function_name}"
+                )
+                logger.error(e)
         end_time = time()
         self.times_per_stages.tiramisu_interface_init = end_time - start_time
         start_time = end_time

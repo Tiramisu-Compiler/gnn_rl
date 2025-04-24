@@ -97,6 +97,8 @@ class TiramisuInterface:
 
     @property
     def tree(self):
+        if self.schedule.tree is None:
+            raise ValueError("Schedule tree is not initialized")
         return self.schedule.tree
 
     def init_server(self):

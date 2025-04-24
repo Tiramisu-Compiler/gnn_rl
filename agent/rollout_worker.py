@@ -7,6 +7,7 @@ from time import time
 
 import ray
 import numpy as np
+import ray.actor
 import torch
 import torch.nn as nn
 import math
@@ -51,11 +52,11 @@ class RolloutWorker:
         dataset_worker: DatasetActor,
         config: AutoSchedulerConfig,
         worker_id: int = 0,
-        function_name: str = None,
+        function_name: str | None = None,
     ):
         Config.config = config
         self.dataset_worker = dataset_worker
-        self.tiramisu_interface: TiramisuInterface = None
+        self.tiramisu_interface: TiramisuInterface | None = None
         self.tiralib_config_path = config.tiralib_config_path
 
         # Variables related to workers and the environment
@@ -79,13 +80,15 @@ class RolloutWorker:
         init_crashed = False
         while not is_program_model_compatible or init_crashed:
             logger.info("Getting next function")
-            if function_name:
+            if function_name and not isinstance(
+                self.dataset_worker, ray.actor.ActorHandle
+            ):
                 function_name, function_data, cpp_code = (
                     self.dataset_worker.get_function_by_name(function_name)
                 )
             else:
                 function_name, function_data, cpp_code = ray.get(
-                    self.dataset_worker.get_next_function.remote()
+                    self.dataset_worker.get_next_function.remote()  # type: ignore
                 )
 
             annotations = function_data.program_annotation
